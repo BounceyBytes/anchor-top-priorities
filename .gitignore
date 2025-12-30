@@ -1,0 +1,19 @@
+# Xcode / Swift
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# SwiftPM
+.build/
+
+# App / OS
+.DS_Store
+
+# Tooling caches (local only)
+.cache/
+
+

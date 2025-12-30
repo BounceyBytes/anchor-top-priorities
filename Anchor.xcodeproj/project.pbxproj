@@ -6,6 +6,26 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7F3D3C832EFCBF6800D44AAF /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 7F3D3C822EFCBF6800D44AAF /* GoogleSignIn */; };
+		7F3D3C862EFCC03900D44AAF /* GoogleAPIClientForRESTCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7F3D3C852EFCC03900D44AAF /* GoogleAPIClientForRESTCore */; };
+		7F3D3C882EFCC03900D44AAF /* GoogleAPIClientForREST_Calendar in Frameworks */ = {isa = PBXBuildFile; productRef = 7F3D3C872EFCC03900D44AAF /* GoogleAPIClientForREST_Calendar */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXBuildRule section */
+		7F3D3C802EFCBE1600D44AAF /* PBXBuildRule */ = {
+			isa = PBXBuildRule;
+			compilerSpec = com.apple.compilers.proxy.script;
+			fileType = pattern.proxy;
+			inputFiles = (
+			);
+			isEditable = 1;
+			outputFiles = (
+			);
+			script = "# Type a script or drag a script file from your workspace to insert its path.\n";
+		};
+/* End PBXBuildRule section */
+
 /* Begin PBXContainerItemProxy section */
 		7F3D3C4A2EFCBADA00D44AAF /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +72,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7F3D3C862EFCC03900D44AAF /* GoogleAPIClientForRESTCore in Frameworks */,
+				7F3D3C882EFCC03900D44AAF /* GoogleAPIClientForREST_Calendar in Frameworks */,
+				7F3D3C832EFCBF6800D44AAF /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -104,6 +127,7 @@
 				7F3D3C3A2EFCBAD900D44AAF /* Resources */,
 			);
 			buildRules = (
+				7F3D3C802EFCBE1600D44AAF /* PBXBuildRule */,
 			);
 			dependencies = (
 			);
@@ -112,6 +136,9 @@
 			);
 			name = Anchor;
 			packageProductDependencies = (
+				7F3D3C822EFCBF6800D44AAF /* GoogleSignIn */,
+				7F3D3C852EFCC03900D44AAF /* GoogleAPIClientForRESTCore */,
+				7F3D3C872EFCC03900D44AAF /* GoogleAPIClientForREST_Calendar */,
 			);
 			productName = Anchor;
 			productReference = 7F3D3C3C2EFCBAD900D44AAF /* Anchor.app */;
@@ -195,6 +222,10 @@
 			);
 			mainGroup = 7F3D3C332EFCBAD900D44AAF;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7F3D3C812EFCBF6800D44AAF /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				7F3D3C842EFCC03900D44AAF /* XCRemoteSwiftPackageReference "google-api-objectivec-client-for-rest" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7F3D3C3D2EFCBAD900D44AAF /* Products */;
 			projectDirPath = "";
@@ -399,12 +430,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Q9U8G7HF99;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "AnchorApp-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -427,12 +454,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Q9U8G7HF99;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "AnchorApp-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -558,6 +581,43 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7F3D3C812EFCBF6800D44AAF /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
+		7F3D3C842EFCC03900D44AAF /* XCRemoteSwiftPackageReference "google-api-objectivec-client-for-rest" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/google-api-objectivec-client-for-rest.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7F3D3C822EFCBF6800D44AAF /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7F3D3C812EFCBF6800D44AAF /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		7F3D3C852EFCC03900D44AAF /* GoogleAPIClientForRESTCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7F3D3C842EFCC03900D44AAF /* XCRemoteSwiftPackageReference "google-api-objectivec-client-for-rest" */;
+			productName = GoogleAPIClientForRESTCore;
+		};
+		7F3D3C872EFCC03900D44AAF /* GoogleAPIClientForREST_Calendar */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7F3D3C842EFCC03900D44AAF /* XCRemoteSwiftPackageReference "google-api-objectivec-client-for-rest" */;
+			productName = GoogleAPIClientForREST_Calendar;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7F3D3C342EFCBAD900D44AAF /* Project object */;
 }

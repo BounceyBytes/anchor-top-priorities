@@ -1,24 +1,31 @@
-//
-//  ContentView.swift
-//  Anchor
-//
-//  Created by James Birney on 24/12/2025.
-//
-
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @State private var priorityManager: PriorityManager?
+    @State private var calendarManager = GoogleCalendarManager()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        Group {
+            if let manager = priorityManager {
+                AnchorMainView()
+                    .environment(manager)
+                    .environment(calendarManager)
+            } else {
+                ProgressView()
+            }
         }
-        .padding()
+        .onAppear {
+            if priorityManager == nil {
+                priorityManager = PriorityManager(modelContext: modelContext)
+            }
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(for: PriorityItem.self, inMemory: true)
+        .preferredColorScheme(.dark)
 }
