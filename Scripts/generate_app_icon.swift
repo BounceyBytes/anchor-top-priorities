@@ -84,7 +84,8 @@ func drawAnchorMark(_ variant: Variant, in ctx: CGContext) {
     }()
 
     let cx: CGFloat = size * 0.5
-    let cy: CGFloat = size * 0.52
+    // Nudge the mark upward a bit so the bottom has more breathing room.
+    let cy: CGFloat = size * 0.52 + size * 0.045
     let s: CGFloat = 1.0
 
     let ringRadius: CGFloat = 70 * s

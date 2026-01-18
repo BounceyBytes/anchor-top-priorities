@@ -176,49 +176,10 @@ struct AnchorMainView: View {
     }
 
     private var headerDateTitle: some View {
-        let screenWidth = max(CGFloat(1), UIScreen.main.bounds.width)
-        let dragX = max(-screenWidth, min(screenWidth, headerDragOffsetX))
-        let progress = min(1.0, Double(abs(dragX) / screenWidth))
-        
-        let incomingDays: Int? = {
-            if dragX > 0 { return -1 }     // swipe right -> previous day
-            if dragX < 0 { return 1 }      // swipe left -> next day
-            return nil
-        }()
-        
-        let incomingDate: Date? = incomingDays.flatMap { days in
-            Calendar.current.date(byAdding: .day, value: days, to: selectedDate)
-        }
-        
-        return ZStack(alignment: .leading) {
-            headerTitleStack(for: selectedDate)
-                .opacity(1.0 - (progress * 0.45))
-                .offset(x: dragX)
-            
-            if let incomingDate {
-                headerTitleStack(for: incomingDate)
-                    .opacity(progress)
-                    .offset(x: dragX + (dragX >= 0 ? -screenWidth : screenWidth))
-            }
-        }
-        // Keep the header from resizing as content slides.
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .clipped()
-        .accessibilityElement(children: .combine)
-    }
-    
-    private func headerTitleStack(for date: Date) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(dayHeaderTitleText(for: date))
-                .anchorFont(.largeTitle, weight: .bold)
-                .foregroundStyle(Color.anchorTextPrimary)
-            
-            if let subtitle = dayHeaderSubtitleText(for: date) {
-                Text(subtitle)
-                    .anchorFont(.caption, weight: .regular)
-                    .foregroundStyle(Color.anchorTextSecondary)
-            }
-        }
+        StreakCirclesView(
+            selectedDate: $selectedDate,
+            priorityManager: priorityManager
+        )
     }
     
     private var dayView: some View {
@@ -355,6 +316,134 @@ struct AnchorMainView: View {
             // Sign out - signOut() handles main thread safety internally
             calendarManager.signOut()
         }
+    }
+}
+
+struct StreakCirclesView: View {
+    @Binding var selectedDate: Date
+    let priorityManager: PriorityManager
+    
+    private let circleSize: CGFloat = 14
+    private let circleSpacing: CGFloat = 10
+    private let daysToShow: Int = 60 // 30 days past and 30 days future
+    
+    private var calendar: Calendar {
+        Calendar.current
+    }
+    
+    private var today: Date {
+        calendar.startOfDay(for: Date())
+    }
+    
+    private var dateRange: [Date] {
+        // Center the range on the selected date, but don't go too far from today
+        let centerDate = selectedDate
+        let startDate = calendar.date(byAdding: .day, value: -daysToShow/2, to: centerDate) ?? centerDate
+        var dates: [Date] = []
+        for i in 0..<daysToShow {
+            if let date = calendar.date(byAdding: .day, value: i, to: startDate) {
+                dates.append(calendar.startOfDay(for: date))
+            }
+        }
+        return dates
+    }
+    
+    private func isTop1Completed(for date: Date) -> Bool {
+        let status = priorityManager.getCompletionStatus(for: date)
+        return status.top1
+    }
+    
+    private func isCurrentDay(_ date: Date) -> Bool {
+        calendar.isDateInToday(date)
+    }
+    
+    private func circleColor(for date: Date) -> Color {
+        let isCompleted = isTop1Completed(for: date)
+        let isToday = isCurrentDay(date)
+        
+        if isToday && !isCompleted {
+            return Color.clear
+        } else if isCompleted {
+            // Use a more vibrant green for completed tasks
+            return Color(red: 0.4, green: 0.8, blue: 0.5)
+        } else {
+            // Use a more visible red for incomplete tasks
+            return Color(red: 0.9, green: 0.3, blue: 0.3)
+        }
+    }
+    
+    private func circleBorderColor(for date: Date) -> Color {
+        let isToday = isCurrentDay(date)
+        let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+        
+        if isSelected {
+            return Color.primary.opacity(0.8)
+        } else if isToday {
+            return Color.primary.opacity(0.3)
+        } else {
+            return Color.clear
+        }
+    }
+    
+    private func circleBorderWidth(for date: Date) -> CGFloat {
+        let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+        let isToday = isCurrentDay(date)
+        if isSelected {
+            return 2.5
+        } else if isToday {
+            return 1.5
+        } else {
+            return 0
+        }
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let centerOffset = (geometry.size.width - circleSize) / 2
+            
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: circleSpacing) {
+                        ForEach(Array(dateRange.enumerated()), id: \.element) { index, date in
+                            Circle()
+                                .fill(circleColor(for: date))
+                                .frame(width: circleSize, height: circleSize)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(circleBorderColor(for: date), lineWidth: circleBorderWidth(for: date))
+                                )
+                                .id(index)
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        selectedDate = date
+                                        proxy.scrollTo(index, anchor: .center)
+                                    }
+                                }
+                        }
+                    }
+                    .padding(.horizontal, centerOffset)
+                }
+                .onAppear {
+                    // Scroll to selected date on appear
+                    if let selectedIndex = dateRange.firstIndex(where: { calendar.isDate($0, inSameDayAs: selectedDate) }) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation {
+                                proxy.scrollTo(selectedIndex, anchor: .center)
+                            }
+                        }
+                    }
+                }
+                .onChange(of: selectedDate) { oldValue, newValue in
+                    // Scroll to new selected date
+                    if let newIndex = dateRange.firstIndex(where: { calendar.isDate($0, inSameDayAs: newValue) }) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            proxy.scrollTo(newIndex, anchor: .center)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(height: circleSize + 4) // Add some vertical padding
     }
 }
 
