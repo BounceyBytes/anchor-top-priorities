@@ -15,75 +15,103 @@ struct SchedulingSheet: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                if !calendarManager.isSignedIn {
-                    ContentUnavailableView(
-                        "Sign In Required",
-                        systemImage: "calendar",
-                        description: Text("Please sign in to Google Calendar to schedule your priorities.")
-                    )
-                    
-                    VStack(spacing: 12) {
-                        Button("Sign In with Google") {
-                            guard let scenes = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                  let root = scenes.windows.first?.rootViewController else { return }
-                            calendarManager.signIn(rootViewController: root)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding()
-                } else {
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            header
-                            
-                            if isLoadingDay {
-                                ProgressView("Loading today's calendar…")
-                                    .padding(.top, 8)
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                VStack(spacing: 20) {
+                    if !calendarManager.isSignedIn {
+                        ContentUnavailableView(
+                            "Sign In Required",
+                            systemImage: "calendar",
+                            description: Text("Please sign in to Google Calendar to schedule your priorities.")
+                        )
+
+                        VStack(spacing: 12) {
+                            Button("Sign In with Google") {
+                                guard let scenes = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                      let root = scenes.windows.first?.rootViewController else { return }
+                                calendarManager.signIn(rootViewController: root)
                             }
-                            
-                            DayTimelineView(
-                                dayDate: today,
-                                events: visibleDayEvents,
-                                taskTitle: itemToSchedule.title,
-                                startTime: $selectedDate,
-                                durationMinutes: $durationMinutes,
-                                onUserAdjusted: {
-                                    hasUserAdjustedTime = true
-                                }
+                            .foregroundColor(.white)
+                            .font(.system(.body, design: .rounded, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.anchorCoral)
                             )
-                            .padding(.horizontal)
-                            Text("Drag the block (or handle) to change start time. Snaps to 15-minute increments.")
-                                .anchorFont(.caption, weight: .semibold)
-                                .foregroundStyle(Color.anchorTextSecondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                            
-                            if isConflicting {
-                                Label("Conflicts with an existing calendar event", systemImage: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.orange)
-                                    .anchorFont(.caption, weight: .semibold)
-                                    .padding(.horizontal)
+
+                            Button("Cancel") {
+                                dismiss()
                             }
-                            
-                            Button("Schedule Event") {
-                                scheduleItem()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(isConflicting)
-                            .padding(.horizontal)
-                            .padding(.top, 4)
+                            .foregroundColor(.white)
+                            .font(.system(.body, design: .rounded, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white.opacity(0.1))
+                            )
                         }
-                        .padding(.vertical, 12)
+                        .padding()
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 16) {
+                                header
+
+                                if isLoadingDay {
+                                    ProgressView("Loading today's calendar…")
+                                        .tint(.white)
+                                        .foregroundColor(.white)
+                                        .padding(.top, 8)
+                                }
+
+                                DayTimelineView(
+                                    dayDate: today,
+                                    events: visibleDayEvents,
+                                    taskTitle: itemToSchedule.title,
+                                    startTime: $selectedDate,
+                                    durationMinutes: $durationMinutes,
+                                    onUserAdjusted: {
+                                        hasUserAdjustedTime = true
+                                    }
+                                )
+                                .padding(.horizontal)
+
+                                Text("Drag the block (or handle) to change start time. Snaps to 15-minute increments.")
+                                    .anchorFont(.caption, weight: .semibold)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+
+                                if isConflicting {
+                                    Label("Conflicts with an existing calendar event", systemImage: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(.orange)
+                                        .anchorFont(.caption, weight: .semibold)
+                                        .padding(.horizontal)
+                                }
+
+                                Button("Schedule Event") {
+                                    scheduleItem()
+                                }
+                                .foregroundColor(.white)
+                                .font(.system(.headline, design: .rounded, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(isConflicting ? Color.gray.opacity(0.3) : Color.anchorCoral)
+                                )
+                                .disabled(isConflicting)
+                                .padding(.horizontal)
+                                .padding(.top, 4)
+                            }
+                            .padding(.vertical, 12)
+                        }
                     }
                 }
+                .padding()
             }
-            .padding()
             .navigationTitle("Schedule Priority")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -91,8 +119,11 @@ struct SchedulingSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(.white)
                 }
             }
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(Color.black, for: .navigationBar)
         }
         .presentationDetents([.medium, .large], selection: $sheetDetent)
         .presentationDragIndicator(.visible)
@@ -119,9 +150,11 @@ struct SchedulingSheet: View {
         VStack(spacing: 6) {
             Text("Schedule time today to")
                 .anchorFont(.title3, weight: .semibold)
+                .foregroundColor(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
             Text(itemToSchedule.title)
                 .anchorFont(.title3, weight: .bold)
+                .foregroundColor(.white)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal)
@@ -323,11 +356,11 @@ private struct DayTimelineView: View {
             }
             .scrollContentBackground(.hidden)
             .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(Color.white.opacity(0.06))
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.05))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
-                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
                     )
             )
             .onAppear {
@@ -456,16 +489,16 @@ private struct DayTimelineView: View {
                 HStack(alignment: .top, spacing: 10) {
                     Text(hourLabel(hour))
                         .anchorFont(.caption, weight: .semibold)
-                        .foregroundStyle(Color.anchorTextSecondary)
+                        .foregroundStyle(Color.white.opacity(0.5))
                         .frame(width: leftGutter - 10, alignment: .trailing)
                         .padding(.top, -6)
-                    
+
                     Rectangle()
-                        .fill(Color.white.opacity(0.09))
+                        .fill(Color.white.opacity(0.12))
                         .frame(height: 1)
                         .overlay(alignment: .top) {
                             Rectangle()
-                                .fill(Color.white.opacity(0.04))
+                                .fill(Color.white.opacity(0.06))
                                 .frame(height: 1)
                                 .offset(y: hourHeight / 2)
                         }
@@ -507,8 +540,8 @@ private struct DayTimelineView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.16),
-                                Color.white.opacity(0.10)
+                                Color.white.opacity(0.12),
+                                Color.white.opacity(0.08)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -516,12 +549,12 @@ private struct DayTimelineView: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                            .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
                     )
                     .overlay(alignment: .topLeading) {
                         Text(event.title)
                             .anchorFont(.caption, weight: .semibold)
-                            .foregroundStyle(Color.white.opacity(0.9))
+                            .foregroundStyle(Color.white.opacity(0.8))
                             .lineLimit(2)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 8)
@@ -638,9 +671,8 @@ private struct DayTimelineView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color.anchorCoral.opacity(0.92),
-                            Color.anchorMint.opacity(0.88),
-                            Color.anchorIndigo.opacity(0.88)
+                            Color.anchorCoral,
+                            Color.anchorCoral.opacity(0.85)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -648,7 +680,7 @@ private struct DayTimelineView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(isConflicting ? Color.orange.opacity(0.9) : Color.white.opacity(0.12), lineWidth: isConflicting ? 2 : 1)
+                        .strokeBorder(isConflicting ? Color.orange.opacity(0.9) : Color.white.opacity(0.2), lineWidth: isConflicting ? 2.5 : 1.5)
                 )
                 .overlay(alignment: .topLeading) {
                     VStack(alignment: .leading, spacing: 4) {
