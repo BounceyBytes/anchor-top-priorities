@@ -291,6 +291,54 @@ class PriorityManager {
         
         return totalStreak
     }
+
+    // MARK: - Streak Risk Detection
+
+    /// Checks if the current streak is at risk (today's #1 priority incomplete and it's late in the day)
+    func isStreakAtRisk(for date: Date = Date()) -> Bool {
+        let calendar = Calendar.current
+
+        // Only check for today
+        guard calendar.isDateInToday(date) else { return false }
+
+        // Check time of day
+        let hour = calendar.component(.hour, from: Date())
+        guard hour >= 18 else { return false } // After 6pm
+
+        // Check if #1 priority exists and is incomplete
+        let priorities = getPriorities(for: date)
+        guard let top1 = priorities.first else { return true } // No task = at risk
+
+        return !top1.isCompleted
+    }
+
+    /// Returns the risk level based on time of day
+    func streakRiskLevel() -> StreakRiskLevel {
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: Date())
+
+        let priorities = getPriorities(for: Date())
+        let top1Incomplete = priorities.first.map { !$0.isCompleted } ?? true
+
+        guard top1Incomplete else { return .safe }
+
+        if hour >= 23 {
+            return .critical
+        } else if hour >= 21 {
+            return .high
+        } else if hour >= 18 {
+            return .warning
+        } else {
+            return .safe
+        }
+    }
+}
+
+enum StreakRiskLevel {
+    case safe
+    case warning    // After 6pm
+    case high       // After 9pm
+    case critical   // After 11pm
 }
 
 enum PriorityError: Error, LocalizedError {

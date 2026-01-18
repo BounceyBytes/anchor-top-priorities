@@ -7,6 +7,8 @@ struct AnchorApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             PriorityItem.self,
+            Achievement.self,
+            UserStats.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

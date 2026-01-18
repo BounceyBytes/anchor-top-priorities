@@ -8,17 +8,19 @@ enum ViewMode {
 
 struct AnchorMainView: View {
     @Environment(PriorityManager.self) private var priorityManager
+    @Environment(AchievementManager.self) private var achievementManager
     @Environment(GoogleCalendarManager.self) private var calendarManager
     @Query(filter: #Predicate<PriorityItem> { $0.dateAssigned != nil }, sort: \.orderIndex)
     private var allAssignedItems: [PriorityItem]
-    
+
     @State private var selectedDate: Date = Date()
     @State private var viewMode: ViewMode = .day
     @State private var showFullScreenBacklog: Bool = false
+    @State private var showAchievements: Bool = false
     @State private var backlogDraftTitle: String = ""
     @State private var backlogInputFocusRequested: Bool = false
     @State private var backlogVisibleHeight: CGFloat = 0
-    
+
     // Swipe-to-navigate header animation state.
     @State private var headerDragOffsetX: CGFloat = 0
     @State private var isCommittingDateSwipe: Bool = false
@@ -101,6 +103,17 @@ struct AnchorMainView: View {
                 }
             }
             .tickRain(trigger: showTickRain)
+            .sheet(isPresented: $showAchievements) {
+                AchievementsView()
+            }
+            .overlay {
+                if achievementManager.showAchievementCelebration,
+                   let achievement = achievementManager.newlyEarnedAchievement {
+                    AchievementCelebrationView(achievement: achievement) {
+                        achievementManager.dismissCelebration()
+                    }
+                }
+            }
         }
         .onAppear {
             // Enforce priority limits on app launch to recover from invalid states
@@ -135,13 +148,19 @@ struct AnchorMainView: View {
                 } label: {
                     Label("Monthly View", systemImage: "calendar")
                 }
-                
+
+                Button {
+                    showAchievements = true
+                } label: {
+                    Label("Achievements", systemImage: "trophy")
+                }
+
                 Button {
                     showFullScreenBacklog = true
                 } label: {
                     Label("Backlog", systemImage: "tray")
                 }
-                
+
                 Divider()
                 
                 if !calendarManager.isSignedIn {
@@ -176,10 +195,25 @@ struct AnchorMainView: View {
     }
 
     private var headerDateTitle: some View {
-        StreakCirclesView(
-            selectedDate: $selectedDate,
-            priorityManager: priorityManager
-        )
+        VStack(spacing: 8) {
+            // Enhanced streak counter
+            EnhancedStreakCounterView(
+                streakCount: priorityManager.calculateCurrentStreak(),
+                nextMilestone: achievementManager.nextMilestone(
+                    currentStreak: priorityManager.calculateCurrentStreak()
+                ),
+                daysUntilMilestone: achievementManager.daysUntilNextMilestone(
+                    currentStreak: priorityManager.calculateCurrentStreak()
+                ),
+                isAtRisk: priorityManager.isStreakAtRisk()
+            )
+
+            // Circles timeline
+            StreakCirclesView(
+                selectedDate: $selectedDate,
+                priorityManager: priorityManager
+            )
+        }
     }
     
     private var dayView: some View {

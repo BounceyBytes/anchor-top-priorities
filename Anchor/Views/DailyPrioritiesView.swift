@@ -3,6 +3,7 @@ import SwiftData
 
 struct DailyPrioritiesView: View {
     @Environment(PriorityManager.self) private var priorityManager
+    @Environment(AchievementManager.self) private var achievementManager
     @Environment(GoogleCalendarManager.self) private var calendarManager
     let selectedDate: Date
     let backlogHeight: CGFloat
@@ -47,7 +48,7 @@ struct DailyPrioritiesView: View {
                     color: slotColors[index % slotColors.count],
                     editingItemId: $editingItemId,
                     onCelebrate: onCelebrate,
-                    onComplete: { priorityManager.toggleCompletion(item) },
+                    onComplete: { handleCompletion(item, index: index) },
                     onPunt: {
                         do {
                             try priorityManager.puntToTomorrow(item)
@@ -164,7 +165,32 @@ struct DailyPrioritiesView: View {
             Text(limitAlertMessage)
         }
     }
-    
+
+    private func handleCompletion(_ item: PriorityItem, index: Int) {
+        // Toggle completion
+        priorityManager.toggleCompletion(item)
+
+        // If this is Priority #1 and we're marking it complete (and it's today), check for achievements
+        if index == 0 && item.isCompleted && Calendar.current.isDateInToday(selectedDate) {
+            let currentStreak = priorityManager.calculateCurrentStreak()
+
+            // Update stats
+            let allComplete = dateItems.count == 3 && dateItems.allSatisfy { $0.isCompleted }
+            achievementManager.updateStats(
+                currentStreak: currentStreak,
+                top1Completed: true,
+                allCompleted: allComplete
+            )
+
+            // Check for new achievements
+            achievementManager.checkAndAwardAchievements(for: currentStreak)
+
+            // Enhanced haptic for #1 completion
+            let impact = UIImpactFeedbackGenerator(style: .heavy)
+            impact.impactOccurred()
+        }
+    }
+
     private func handleSwipeEnd(value: DragGesture.Value, item: PriorityItem, index: Int) {
         let horizontalSwipe = abs(value.translation.width) > abs(value.translation.height)
         let swipeThreshold: CGFloat = swipeAffordanceThreshold
@@ -174,14 +200,14 @@ struct DailyPrioritiesView: View {
             if value.translation.width > swipeThreshold {
                 // Swipe right - mark as completed
                 if !item.isCompleted {
-                    priorityManager.toggleCompletion(item)
+                    handleCompletion(item, index: index)
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
                 }
             } else if value.translation.width < -swipeThreshold {
                 // Swipe left - mark as uncompleted
                 if item.isCompleted {
-                    priorityManager.toggleCompletion(item)
+                    handleCompletion(item, index: index)
                     let generator = UIImpactFeedbackGenerator(style: .light)
                     generator.impactOccurred()
                 }
@@ -317,15 +343,25 @@ struct PrioritySlotCard: View {
         VStack(alignment: .leading, spacing: 10) {
             // Line 1: Priority number + task title
             HStack(alignment: .center, spacing: 10) {
-                // Priority Number Badge
-                Text("\(priorityNumber)")
-                    .anchorFont(.title2, weight: .bold)
-                    .foregroundStyle(item.isCompleted ? .black.opacity(0.55) : .black.opacity(0.75))
-                    .frame(width: badgeSize, height: badgeSize)
-                    .background(
-                        Circle()
-                            .fill(item.isCompleted ? .white.opacity(0.3) : .white.opacity(0.45))
-                    )
+                // Priority Number Badge with Crown for #1
+                ZStack {
+                    Text("\(priorityNumber)")
+                        .anchorFont(.title2, weight: .bold)
+                        .foregroundStyle(item.isCompleted ? .black.opacity(0.55) : .black.opacity(0.75))
+                        .frame(width: badgeSize, height: badgeSize)
+                        .background(
+                            Circle()
+                                .fill(item.isCompleted ? .white.opacity(0.3) : .white.opacity(0.45))
+                        )
+
+                    // Crown icon for Priority #1
+                    if isPrimary && !item.isCompleted {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.yellow)
+                            .offset(x: 14, y: -14)
+                    }
+                }
                 
                 if isInlineEditing {
                     HStack(spacing: 8) {
@@ -460,8 +496,10 @@ struct PrioritySlotCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(
-                    .white.opacity(item.isCompleted ? 0.25 : 0.55),
-                    lineWidth: 2
+                    isPrimary && !item.isCompleted
+                        ? Color.yellow.opacity(0.4)
+                        : .white.opacity(item.isCompleted ? 0.25 : 0.55),
+                    lineWidth: isPrimary && !item.isCompleted ? 3 : 2
                 )
         )
         .cornerRadius(16)
