@@ -182,6 +182,8 @@ struct BacklogView: View {
                 Text("Backlog")
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(Color.white)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: togglePanelHeightFromHandleTap)
                 Spacer()
 
                 HStack(spacing: 12) {
@@ -204,6 +206,8 @@ struct BacklogView: View {
                                 .stroke(Color.white.opacity(0.3), lineWidth: 1)
                         )
                         .shadow(color: Color.anchorIndigo.opacity(0.3), radius: 4, x: 0, y: 2)
+                        .contentShape(Capsule())
+                        .onTapGesture(perform: togglePanelHeightFromHandleTap)
 
                     Button {
                         // User intent is to type: take them full-screen so the keyboard doesn't hide the field.
