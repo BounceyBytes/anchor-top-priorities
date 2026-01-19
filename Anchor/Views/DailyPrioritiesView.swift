@@ -269,18 +269,23 @@ struct PrioritySlotCard: View {
     @State private var renameText = ""
     @State private var inlineEditText = ""
     @State private var suppressCommitOnEnd = false
+    @State private var completionScale: CGFloat = 1.0
+    @State private var completionOffset: CGFloat = 0
     @FocusState private var isInlineTitleFocused: Bool
 
-    private var cardBackgroundColor: Color {
-        item.isCompleted ? Color.anchorCompletedGreen.opacity(0.6) : color
+    private var cardBackgroundGradient: LinearGradient {
+        if item.isCompleted {
+            return LinearGradient.completedGradient
+        }
+        return LinearGradient.forPriority(priorityNumber)
     }
-    
+
     private var primaryForegroundColor: Color {
-        item.isCompleted ? .black.opacity(0.65) : .black
+        item.isCompleted ? .black.opacity(0.65) : .white
     }
-    
+
     private var secondaryForegroundColor: Color {
-        item.isCompleted ? .black.opacity(0.45) : .black.opacity(0.6)
+        item.isCompleted ? .black.opacity(0.45) : .white.opacity(0.85)
     }
     
     private var isPrimary: Bool { priorityNumber == 1 }
@@ -319,38 +324,46 @@ struct PrioritySlotCard: View {
             HStack(alignment: .center, spacing: 10) {
                 // Priority Number Badge
                 Text("\(priorityNumber)")
-                    .anchorFont(.title2, weight: .bold)
-                    .foregroundStyle(item.isCompleted ? .black.opacity(0.55) : .black.opacity(0.75))
+                    .font(.system(.title2, design: .rounded).weight(.heavy))
+                    .foregroundStyle(item.isCompleted ? .black.opacity(0.55) : .white)
                     .frame(width: badgeSize, height: badgeSize)
                     .background(
                         Circle()
-                            .fill(item.isCompleted ? .white.opacity(0.3) : .white.opacity(0.45))
+                            .fill(item.isCompleted ? .white.opacity(0.3) : .white.opacity(0.25))
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.4), lineWidth: 2)
+                            )
                     )
                 
                 if isInlineEditing {
                     HStack(spacing: 8) {
                         TextField("Task name", text: $inlineEditText)
                             .anchorFont(Self.unifiedTitleFont, weight: Self.unifiedTitleWeight)
-                            .foregroundStyle(primaryForegroundColor)
+                            .foregroundStyle(.white)
                             .focused($isInlineTitleFocused)
                             .submitLabel(.done)
                             .onSubmit { commitInlineEdit(endEditing: true) }
-                            .tint(primaryForegroundColor)
+                            .tint(.white)
                             .padding(.vertical, 6)
                             .padding(.horizontal, 10)
-                            .background(.white.opacity(0.25))
+                            .background(.white.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        
+
                         Button(action: { commitInlineEdit(endEditing: true) }) {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.95))
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.white)
                         }
                         .buttonStyle(.plain)
-                        
+
                         Button(action: cancelInlineEdit) {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.75))
                         }
                         .buttonStyle(.plain)
@@ -388,7 +401,7 @@ struct PrioritySlotCard: View {
                     if isPrimary && !item.isCompleted {
                         Text("Put all energy here!")
                             .anchorFont(.caption, weight: .semibold)
-                            .foregroundStyle(.black.opacity(0.55))
+                            .foregroundStyle(.white.opacity(0.75))
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
                             .multilineTextAlignment(.leading)
@@ -399,25 +412,33 @@ struct PrioritySlotCard: View {
                 Button(action: onPomodoro) {
                     Image(systemName: "timer")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(secondaryForegroundColor)
-                        .frame(width: 32, height: 32)
+                        .foregroundStyle(item.isCompleted ? .black.opacity(0.5) : .white)
+                        .frame(width: 36, height: 36)
                         .background(
                             Circle()
-                                .fill(item.isCompleted ? .white.opacity(0.2) : .white.opacity(0.3))
+                                .fill(.white.opacity(item.isCompleted ? 0.2 : 0.2))
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(item.isCompleted ? 0.2 : 0.3), lineWidth: 1)
+                                )
                         )
                 }
-                
+
                 Button(action: onSchedule) {
                     Image(systemName: isScheduled ? "calendar.badge.checkmark" : "calendar")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(secondaryForegroundColor)
-                        .frame(width: 32, height: 32)
+                        .foregroundStyle(item.isCompleted ? .black.opacity(0.5) : .white)
+                        .frame(width: 36, height: 36)
                         .background(
                             Circle()
-                                .fill(item.isCompleted ? .white.opacity(0.2) : .white.opacity(0.3))
+                                .fill(.white.opacity(item.isCompleted ? 0.2 : 0.2))
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(item.isCompleted ? 0.2 : 0.3), lineWidth: 1)
+                                )
                         )
                 }
-                
+
                 Menu {
                     Button(action: {
                         renameText = item.title
@@ -437,7 +458,7 @@ struct PrioritySlotCard: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .padding(8)
-                        .foregroundStyle(.black.opacity(0.5))
+                        .foregroundStyle(item.isCompleted ? .black.opacity(0.5) : .white.opacity(0.7))
                 }
             }
         }
@@ -445,11 +466,11 @@ struct PrioritySlotCard: View {
         .padding(14)
         .background {
             ZStack {
-                cardBackgroundColor
+                cardBackgroundGradient
                 if item.isCompleted {
                     Image(systemName: "checkmark")
                         .font(.system(size: 170, weight: .black))
-                        .foregroundStyle(.white.opacity(0.12))
+                        .foregroundStyle(.white.opacity(0.18))
                         .rotationEffect(.degrees(-18))
                         .offset(x: 16, y: 6)
                         .allowsHitTesting(false)
@@ -457,17 +478,12 @@ struct PrioritySlotCard: View {
                 }
             }
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(
-                    .white.opacity(item.isCompleted ? 0.25 : 0.55),
-                    lineWidth: 2
-                )
-        )
-        .cornerRadius(16)
-        .shadow(color: cardShadowColor, radius: cardShadowRadius, x: 0, y: cardShadowYOffset)
-        .animation(.spring, value: item.isCompleted)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .priorityCard(color: color, isCompleted: item.isCompleted, cornerRadius: 20)
+        .scaleEffect(completionScale)
+        .offset(y: completionOffset)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: item.isCompleted)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: completionScale)
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onTapGesture {
             guard !isInlineEditing else { return }
             editingItemId = item.id
@@ -502,12 +518,26 @@ struct PrioritySlotCard: View {
                 let successGenerator = UINotificationFeedbackGenerator()
                 successGenerator.notificationOccurred(.success)
 
+                // Bounce animation on completion
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                    completionScale = 1.15
+                    completionOffset = -8
+                }
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2)) {
+                    completionScale = 1.0
+                    completionOffset = 0
+                }
+
                 // Full-screen tick rain (owned by the parent view).
                 onCelebrate()
             } else if !newValue && oldValue {
                 // Light haptic for uncompleting
                 let generator = UIImpactFeedbackGenerator(style: .light)
                 generator.impactOccurred()
+
+                // Reset scale and offset
+                completionScale = 1.0
+                completionOffset = 0
             }
         }
         .alert("Rename Task", isPresented: $showRenameAlert) {
@@ -596,7 +626,7 @@ private struct SwipeAffordanceOverlay: View {
                 SideArcAffordance(
                     side: .right,
                     progress: rightProgress,
-                    color: Color(red: 0.2, green: 0.9, blue: 0.3), // Vibrant green
+                    color: Color.anchorStreakGreen,
                     systemImage: "checkmark",
                     screenWidth: screenWidth,
                     cardHeight: availableHeight
@@ -604,7 +634,7 @@ private struct SwipeAffordanceOverlay: View {
                 SideArcAffordance(
                     side: .left,
                     progress: leftProgress,
-                    color: Color(red: 1.0, green: 0.85, blue: 0.0), // Vibrant yellow
+                    color: Color(red: 1.0, green: 0.75, blue: 0.0),
                     systemImage: "arrow.uturn.left",
                     screenWidth: screenWidth,
                     cardHeight: availableHeight
@@ -652,8 +682,7 @@ private struct SideArcAffordance: View {
         let iconOpacity = Double(clamp(0.15 + t * 0.95, min: 0, max: 1))
 
         ZStack {
-            // Draw the arc shape using a Path
-            // The arc curves from the top edge, inward 30% at the middle, then back to the bottom edge
+            // Draw the arc shape using a Path with gradient
             Path { path in
                 // Start at top edge
                 path.move(to: CGPoint(x: startX, y: 0))
@@ -668,16 +697,34 @@ private struct SideArcAffordance: View {
                 path.addLine(to: CGPoint(x: (side == .right) ? w : 0, y: 0))
                 path.closeSubpath()
             }
-            .fill(color)
-            .opacity(Double(t))
+            .fill(
+                LinearGradient(
+                    colors: [
+                        color.opacity(0.9),
+                        color.opacity(0.7)
+                    ],
+                    startPoint: side == .right ? .trailing : .leading,
+                    endPoint: side == .right ? .leading : .trailing
+                )
+            )
+            .opacity(Double(t * 0.95))
+            .shadow(color: color.opacity(0.4 * Double(t)), radius: 8, x: 0, y: 0)
 
-            Image(systemName: systemImage)
-                .font(.system(size: 34, weight: .heavy))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 4)
-                .position(x: iconX, y: h / 2)
-                .scaleEffect(0.88 + (0.14 * t))
-                .opacity(iconOpacity)
+            // Icon with enhanced styling
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.25))
+                    .frame(width: 56, height: 56)
+                    .blur(radius: 4)
+
+                Image(systemName: systemImage)
+                    .font(.system(size: 32, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 2)
+            }
+            .position(x: iconX, y: h / 2)
+            .scaleEffect(0.75 + (0.35 * t))
+            .opacity(iconOpacity)
         }
         .frame(width: w, height: h)
         .clipped()
@@ -687,37 +734,73 @@ private struct SideArcAffordance: View {
 struct EmptySlotCard: View {
     let priorityNumber: Int
     let color: Color
-    
+
+    @State private var shimmerOffset: CGFloat = -200
+
     private var badgeSize: CGFloat {
         priorityNumber == 1 ? 40 : priorityNumber == 2 ? 34 : 30
     }
-    
+
+    private var cardGradient: LinearGradient {
+        LinearGradient.forPriority(priorityNumber)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Line 1: Priority number + "Add Priority" text (matching PrioritySlotCard structure)
             HStack(alignment: .center, spacing: 10) {
                 // Priority Number Badge
                 Text("\(priorityNumber)")
-                    .anchorFont(.title2, weight: .bold)
-                    .foregroundStyle(color.opacity(0.7))
+                    .font(.system(.title2, design: .rounded).weight(.heavy))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [color.opacity(0.8), color.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: badgeSize, height: badgeSize)
                     .background(
                         Circle()
-                            .fill(color.opacity(0.2))
+                            .fill(color.opacity(0.15))
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [color.opacity(0.4), color.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1.5
+                                    )
+                            )
                     )
-                
+
                 HStack(spacing: 8) {
-                    Image(systemName: "plus")
-                        .foregroundStyle(color)
-                    Text("Add Priority \(priorityNumber)")
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [color.opacity(0.7), color.opacity(0.5)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Text("Tap to add priority")
                         .anchorFont(.title3, weight: .semibold)
-                        .foregroundStyle(color.opacity(0.8))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [color.opacity(0.7), color.opacity(0.5)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                 }
-                
+
                 Spacer()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             // Line 2: Empty space to match action buttons row in PrioritySlotCard
             HStack(spacing: 8) {
                 Spacer()
@@ -727,10 +810,44 @@ struct EmptySlotCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(color.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [5]))
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.white.opacity(0.03))
+
+                // Shimmer effect
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                color.opacity(0.1),
+                                .clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .offset(x: shimmerOffset)
+                    .blur(radius: 10)
+            }
         )
-        .contentShape(Rectangle())
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [color.opacity(0.4), color.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                )
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 20))
+        .onAppear {
+            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                shimmerOffset = 400
+            }
+        }
     }
 }
 

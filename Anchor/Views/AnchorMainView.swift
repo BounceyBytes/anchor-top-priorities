@@ -188,7 +188,12 @@ struct AnchorMainView: View {
             VStack(spacing: 0) {
                 // Date nav / header (pinned to top)
                 dayHeaderBar
-                
+
+                // Daily progress bar
+                DailyProgressBar(items: selectedDateItems)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+
                 // The Anchor
                 DailyPrioritiesView(
                     selectedDate: selectedDate,
@@ -322,19 +327,21 @@ struct AnchorMainView: View {
 struct StreakCirclesView: View {
     @Binding var selectedDate: Date
     let priorityManager: PriorityManager
-    
+
+    @State private var pulseScale: CGFloat = 1.0
+
     private let circleSize: CGFloat = 14
     private let circleSpacing: CGFloat = 10
     private let daysToShow: Int = 60 // 30 days past and 30 days future
-    
+
     private var calendar: Calendar {
         Calendar.current
     }
-    
+
     private var today: Date {
         calendar.startOfDay(for: Date())
     }
-    
+
     private var dateRange: [Date] {
         // Center the range on the selected date, but don't go too far from today
         let centerDate = selectedDate
@@ -347,51 +354,57 @@ struct StreakCirclesView: View {
         }
         return dates
     }
-    
+
     private func isTop1Completed(for date: Date) -> Bool {
         let status = priorityManager.getCompletionStatus(for: date)
         return status.top1
     }
-    
+
     private func isCurrentDay(_ date: Date) -> Bool {
         calendar.isDateInToday(date)
     }
-    
-    private func circleColor(for date: Date) -> Color {
+
+    private func circleGradient(for date: Date) -> LinearGradient {
         let isCompleted = isTop1Completed(for: date)
         let isToday = isCurrentDay(date)
-        
+
         if isToday && !isCompleted {
-            return Color.clear
+            return LinearGradient(
+                colors: [.clear, .clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         } else if isCompleted {
-            // Use a more vibrant green for completed tasks
-            return Color(red: 0.4, green: 0.8, blue: 0.5)
+            return LinearGradient.streakGradient
         } else {
-            // Use a more visible red for incomplete tasks
-            return Color(red: 0.9, green: 0.3, blue: 0.3)
+            return LinearGradient(
+                colors: [Color.anchorStreakRed, Color.anchorStreakRed.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         }
     }
-    
+
     private func circleBorderColor(for date: Date) -> Color {
         let isToday = isCurrentDay(date)
         let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
-        
+
         if isSelected {
-            return Color.primary.opacity(0.8)
+            return Color.white.opacity(0.9)
         } else if isToday {
-            return Color.primary.opacity(0.3)
+            return Color.white.opacity(0.5)
         } else {
             return Color.clear
         }
     }
-    
+
     private func circleBorderWidth(for date: Date) -> CGFloat {
         let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
         let isToday = isCurrentDay(date)
         if isSelected {
             return 2.5
         } else if isToday {
-            return 1.5
+            return 2.0
         } else {
             return 0
         }
@@ -400,17 +413,38 @@ struct StreakCirclesView: View {
     var body: some View {
         GeometryReader { geometry in
             let centerOffset = (geometry.size.width - circleSize) / 2
-            
+
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: circleSpacing) {
                         ForEach(Array(dateRange.enumerated()), id: \.element) { index, date in
+                            let isToday = isCurrentDay(date)
+                            let isCompleted = isTop1Completed(for: date)
+
                             Circle()
-                                .fill(circleColor(for: date))
+                                .fill(circleGradient(for: date))
                                 .frame(width: circleSize, height: circleSize)
                                 .overlay(
                                     Circle()
                                         .strokeBorder(circleBorderColor(for: date), lineWidth: circleBorderWidth(for: date))
+                                )
+                                .overlay(
+                                    // Add glow effect for completed circles
+                                    Group {
+                                        if isCompleted {
+                                            Circle()
+                                                .stroke(Color.anchorStreakGreen.opacity(0.3), lineWidth: 2)
+                                                .blur(radius: 2)
+                                        }
+                                    }
+                                )
+                                .scaleEffect(isToday && !isCompleted ? pulseScale : 1.0)
+                                .shadow(
+                                    color: isCompleted ? Color.anchorStreakGreen.opacity(0.4) :
+                                           isToday ? Color.white.opacity(0.2) : .clear,
+                                    radius: isCompleted ? 4 : 2,
+                                    x: 0,
+                                    y: 0
                                 )
                                 .id(index)
                                 .onTapGesture {
@@ -424,6 +458,11 @@ struct StreakCirclesView: View {
                     .padding(.horizontal, centerOffset)
                 }
                 .onAppear {
+                    // Start pulse animation for today
+                    withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                        pulseScale = 1.3
+                    }
+
                     // Scroll to selected date on appear
                     if let selectedIndex = dateRange.firstIndex(where: { calendar.isDate($0, inSameDayAs: selectedDate) }) {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -444,6 +483,72 @@ struct StreakCirclesView: View {
             }
         }
         .frame(height: circleSize + 4) // Add some vertical padding
+    }
+}
+
+struct DailyProgressBar: View {
+    let items: [PriorityItem]
+
+    private var completedCount: Int {
+        items.filter { $0.isCompleted }.count
+    }
+
+    private var totalCount: Int {
+        min(items.count, 3) // Max 3 priorities per day
+    }
+
+    private var progressPercentage: CGFloat {
+        guard totalCount > 0 else { return 0 }
+        return CGFloat(completedCount) / CGFloat(totalCount)
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background track
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.white.opacity(0.1))
+                        .frame(height: 8)
+
+                    // Progress fill with gradient
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.anchorStreakGreen,
+                                    Color.anchorStreakTeal
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width * progressPercentage, height: 8)
+                        .shadow(color: Color.anchorStreakGreen.opacity(0.5), radius: 4, x: 0, y: 0)
+                }
+            }
+            .frame(height: 8)
+
+            // Progress text
+            if totalCount > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: completedCount == totalCount ? "checkmark.circle.fill" : "circle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(
+                            completedCount == totalCount ?
+                                Color.anchorStreakGreen :
+                                Color.white.opacity(0.5)
+                        )
+
+                    Text("\(completedCount) of \(totalCount) priorities completed")
+                        .font(.system(.caption2, design: .rounded).weight(.medium))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: completedCount)
     }
 }
 

@@ -144,41 +144,70 @@ struct BacklogView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Handle for resizing
+            // Handle for resizing with enhanced styling
             HStack {
                 Spacer()
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(Color.secondary.opacity(0.4))
-                    .frame(width: 40, height: 5)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.5), Color.white.opacity(0.3)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: 48, height: 5)
+                    .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
                 Spacer()
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background(headerBackground)
             .contentShape(Rectangle())
             .onTapGesture(perform: togglePanelHeightFromHandleTap)
             .simultaneousGesture(resizeGesture)
             
-            // Header
+            // Header with enhanced styling
             HStack {
                 Text("Backlog")
-                    .anchorFont(.title3, weight: .bold)
+                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .foregroundStyle(Color.white)
                 Spacer()
-                
-                HStack(spacing: 10) {
+
+                HStack(spacing: 12) {
+                    // Count badge with gradient
                     Text("\(backlogItems.count)")
-                        .font(.caption)
-                        .padding(6)
-                        .background(Color.gray.opacity(0.2))
-                        .clipShape(Circle())
-                    
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                        .foregroundStyle(Color.white)
+                        .frame(minWidth: 24, minHeight: 24)
+                        .padding(.horizontal, 6)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.anchorIndigo.opacity(0.8), Color.anchorDeepIndigo.opacity(0.9)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        )
+                        .shadow(color: Color.anchorIndigo.opacity(0.3), radius: 4, x: 0, y: 2)
+
                     Button {
                         // User intent is to type: take them full-screen so the keyboard doesn't hide the field.
                         requestFullScreenFocus = true
                         showFullScreenBacklog = true
                     } label: {
                         Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                        .foregroundStyle(Color.anchorIndigo)
+                            .font(.system(.title3, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.anchorIndigo, Color.anchorDeepIndigo],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: Color.anchorIndigo.opacity(0.4), radius: 3, x: 0, y: 1)
                             .accessibilityLabel("Add to backlog")
                     }
                 }
@@ -199,45 +228,79 @@ struct BacklogView: View {
             if !isMinimized {
                 if !backlogItems.isEmpty {
                     ScrollView {
-                        LazyVStack(spacing: 0) {
+                        LazyVStack(spacing: 8) {
                             ForEach(backlogItems) { item in
-                                HStack {
+                                HStack(spacing: 12) {
+                                    // Bullet indicator
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.white.opacity(0.4), Color.white.opacity(0.2)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 6, height: 6)
+
                                     Text(item.title)
-                                        .anchorFont(.body)
+                                        .font(.system(.body, design: .rounded).weight(.medium))
+                                        .foregroundStyle(Color.white.opacity(0.9))
                                         .lineLimit(2)
                                         .truncationMode(.tail)
                                         .multilineTextAlignment(.leading)
                                         .fixedSize(horizontal: false, vertical: true)
                                         .layoutPriority(1)
+
                                     Spacer()
-                                    
-                                    Button {
-                                        // "Move to selected date" action
-                                        do {
-                                            try priorityManager.moveToDate(item, date: selectedDate)
-                                        } catch {
-                                            limitAlertMessage = error.localizedDescription
-                                            showLimitAlert = true
+
+                                    HStack(spacing: 8) {
+                                        Button {
+                                            // "Move to selected date" action
+                                            do {
+                                                try priorityManager.moveToDate(item, date: selectedDate)
+                                            } catch {
+                                                limitAlertMessage = error.localizedDescription
+                                                showLimitAlert = true
+                                            }
+                                        } label: {
+                                            Image(systemName: "arrow.up.circle.fill")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(
+                                                    LinearGradient(
+                                                        colors: [Color.anchorMint, Color.anchorAmber],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    )
+                                                )
+                                                .shadow(color: Color.anchorMint.opacity(0.3), radius: 2, x: 0, y: 1)
                                         }
-                                    } label: {
-                                        Image(systemName: "arrow.up.circle")
-                                            .foregroundStyle(Color.anchorMint)
-                                    }
-                                    
-                                    Button {
-                                        withAnimation {
-                                            priorityManager.modelContext.delete(item)
+
+                                        Button {
+                                            withAnimation {
+                                                priorityManager.modelContext.delete(item)
+                                            }
+                                        } label: {
+                                            Image(systemName: "trash.fill")
+                                                .font(.system(size: 18, weight: .semibold))
+                                                .foregroundStyle(Color.red.opacity(0.8))
                                         }
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .foregroundStyle(Color.red)
                                     }
                                 }
-                                .padding(.horizontal)
+                                .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.white.opacity(0.05))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                        )
+                                )
                                 .contentShape(Rectangle())
                             }
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
                     }
                     .frame(maxHeight: panelHeight)
                 } else {

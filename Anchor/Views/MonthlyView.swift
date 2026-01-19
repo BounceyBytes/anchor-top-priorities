@@ -240,62 +240,172 @@ struct DayCellView: View {
     
     var body: some View {
         ZStack {
-            // Background color
-            RoundedRectangle(cornerRadius: 8)
+            // Background with gradient heatmap styling
+            RoundedRectangle(cornerRadius: 10)
                 .fill(
-                    shouldShowGreenBackground ? Color.anchorCompletedGreen.opacity(0.3) :
-                    shouldShowRedBackground ? Color.red.opacity(0.3) :
-                    Color.clear
+                    shouldShowGreenBackground ?
+                        LinearGradient(
+                            colors: [Color.anchorStreakGreen.opacity(0.4), Color.anchorStreakTeal.opacity(0.3)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                    shouldShowRedBackground ?
+                        LinearGradient(
+                            colors: [Color.anchorStreakRed.opacity(0.4), Color.anchorStreakRed.opacity(0.3)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(
+                            colors: [Color.clear, Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                 )
-            
-            // Watermarked icon
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(
+                            shouldShowGreenBackground ?
+                                Color.anchorStreakGreen.opacity(0.4) :
+                            shouldShowRedBackground ?
+                                Color.anchorStreakRed.opacity(0.4) :
+                                Color.white.opacity(0.08),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(
+                    color: shouldShowGreenBackground ? Color.anchorStreakGreen.opacity(0.3) :
+                           shouldShowRedBackground ? Color.anchorStreakRed.opacity(0.2) : .clear,
+                    radius: 4,
+                    x: 0,
+                    y: 2
+                )
+
+            // Watermarked icon with gradient
             if shouldShowGreenBackground {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(Color.anchorCompletedGreen.opacity(0.15))
+                    .font(.system(size: 32, weight: .black))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.15), Color.white.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             } else if shouldShowRedBackground {
                 Image(systemName: "xmark")
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(Color.red.opacity(0.15))
+                    .font(.system(size: 32, weight: .black))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.12), Color.white.opacity(0.06)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
             
             VStack(spacing: 4) {
-                // Day number
+                // Day number with enhanced styling
                 Text("\(dayNumber)")
-                    .anchorFont(.caption, weight: isToday ? .bold : .regular)
+                    .font(.system(.caption, design: .rounded).weight(isToday ? .bold : .medium))
                     .foregroundStyle(
                         shouldShowGreenBackground || shouldShowRedBackground ? .white :
-                        (isFuture ? .secondary : .primary)
+                        (isFuture ? Color.white.opacity(0.4) : Color.white.opacity(0.9))
                     )
-                
+
                 // Completion indicators (only show if not using full background)
                 if !isFuture && !shouldShowGreenBackground && !shouldShowRedBackground {
-                    HStack(spacing: 2) {
-                        // Top 2 indicator
-                        if completionStatus.top1 {
+                    HStack(spacing: 3) {
+                        // Top 1 indicator
+                        if hasTop1Priority {
                             Circle()
-                                .fill(completionStatus.top2 ? Color.anchorMint : Color.gray.opacity(0.2))
-                                .frame(width: 6, height: 6)
+                                .fill(
+                                    completionStatus.top1 ?
+                                        LinearGradient(
+                                            colors: [Color.anchorCoral, Color.anchorCoralDeep],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ) :
+                                        LinearGradient(
+                                            colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                )
+                                .frame(width: 7, height: 7)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(completionStatus.top1 ? 0.3 : 0.1), lineWidth: 0.5)
+                                )
                         }
-                        
-                        // Top 3 indicator
-                        if completionStatus.top2 {
+
+                        // Top 2 indicator
+                        if prioritiesForDate.count > 1 {
                             Circle()
-                                .fill(completionStatus.top3 ? Color.anchorIndigo : Color.gray.opacity(0.2))
-                                .frame(width: 6, height: 6)
+                                .fill(
+                                    completionStatus.top2 ?
+                                        LinearGradient(
+                                            colors: [Color.anchorMint, Color.anchorAmber],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ) :
+                                        LinearGradient(
+                                            colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                )
+                                .frame(width: 7, height: 7)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(completionStatus.top2 ? 0.3 : 0.1), lineWidth: 0.5)
+                                )
+                        }
+
+                        // Top 3 indicator
+                        if prioritiesForDate.count > 2 {
+                            Circle()
+                                .fill(
+                                    completionStatus.top3 ?
+                                        LinearGradient(
+                                            colors: [Color.anchorIndigo, Color.anchorDeepIndigo],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ) :
+                                        LinearGradient(
+                                            colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                )
+                                .frame(width: 7, height: 7)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(completionStatus.top3 ? 0.3 : 0.1), lineWidth: 0.5)
+                                )
                         }
                     }
-                    
-                    // Streak indicator
+
+                    // Streak indicator with gradient
                     if streakLength > 1 && completionStatus.top1 {
                         Text("\(streakLength)")
-                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                            .font(.system(size: 9, weight: .heavy, design: .rounded))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
-                                    .fill(Color.green.opacity(0.8))
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.anchorStreakGreen, Color.anchorStreakTeal],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
+                                    )
+                                    .shadow(color: Color.anchorStreakGreen.opacity(0.4), radius: 2, x: 0, y: 1)
                             )
                     }
                 }
