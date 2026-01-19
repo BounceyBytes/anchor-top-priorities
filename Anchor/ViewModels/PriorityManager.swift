@@ -10,6 +10,87 @@ class PriorityManager {
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
+
+    // MARK: - Backlog Copy Helpers
+
+    private func normalizedTitle(_ title: String) -> String {
+        title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    /// Copies any *incomplete* items from past days into the backlog while keeping them on their original day.
+    ///
+    /// Business rules:
+    /// - If a corresponding item already exists in the backlog, do not duplicate it.
+    ///   We treat "already exists" as either:
+    ///   - a backlog item whose `sourceItemId` matches the original item's `id`, OR
+    ///   - a backlog item with the same normalized title (to avoid title-level duplication).
+    func copyIncompletePastItemsToBacklogIfNeeded(referenceDate: Date = Date()) {
+        let calendar = Calendar.current
+        let todayStart = calendar.startOfDay(for: referenceDate)
+
+        // 1) Fetch all backlog items once so we can do fast in-memory duplicate checks.
+        let backlogDescriptor = FetchDescriptor<PriorityItem>(
+            predicate: #Predicate<PriorityItem> { $0.dateAssigned == nil }
+        )
+        let backlogItems = (try? modelContext.fetch(backlogDescriptor)) ?? []
+
+        var existingBacklogSourceIds = Set<UUID>()
+        var existingBacklogTitles = Set<String>()
+
+        for item in backlogItems {
+            if let sourceId = item.sourceItemId {
+                existingBacklogSourceIds.insert(sourceId)
+            }
+            existingBacklogTitles.insert(normalizedTitle(item.title))
+        }
+
+        // 2) Fetch all incomplete items assigned before today (i.e. past days).
+        let pastIncompleteDescriptor = FetchDescriptor<PriorityItem>(
+            predicate: #Predicate<PriorityItem> { item in
+                item.dateAssigned != nil &&
+                item.isCompleted == false &&
+                item.dateAssigned! < todayStart
+            },
+            sortBy: [SortDescriptor(\.dateAssigned, order: .forward), SortDescriptor(\.orderIndex, order: .forward)]
+        )
+
+        let pastIncomplete = (try? modelContext.fetch(pastIncompleteDescriptor)) ?? []
+        guard !pastIncomplete.isEmpty else { return }
+
+        var didInsert = false
+        for source in pastIncomplete {
+            let sourceId = source.id
+            let titleKey = normalizedTitle(source.title)
+
+            // Avoid duplicating in backlog.
+            if existingBacklogSourceIds.contains(sourceId) { continue }
+            if existingBacklogTitles.contains(titleKey) { continue }
+
+            let copy = PriorityItem(
+                title: source.title,
+                dateAssigned: nil,
+                orderIndex: 0,
+                sourceItemId: sourceId
+            )
+            copy.notes = source.notes
+            // Do not copy calendar linkage/scheduling into backlog; backlog items are unscheduled by design.
+            copy.calendarEventId = nil
+            copy.calendarEventStartTime = nil
+            copy.isCompleted = false
+
+            modelContext.insert(copy)
+
+            existingBacklogSourceIds.insert(sourceId)
+            existingBacklogTitles.insert(titleKey)
+            didInsert = true
+        }
+
+        if didInsert {
+            try? modelContext.save()
+        }
+    }
     
     // MARK: - Ordering Helpers
     

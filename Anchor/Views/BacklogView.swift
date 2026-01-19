@@ -27,17 +27,15 @@ struct BacklogView: View {
     @State private var showLimitAlert = false
     @State private var limitAlertMessage = ""
     @State private var inputAreaMeasuredHeight: CGFloat = 0
-    @State private var dragCommittedToExpand: Bool = false
     /// Prevents an iOS focus-restoration blip (e.g. after dismissing the full-screen backlog)
     /// from immediately re-presenting the full-screen cover.
     @State private var suppressFocusDrivenFullScreenPresentation: Bool = false
     
-    private static let minPanelHeight: CGFloat = 120
-    private static let maxPanelHeight: CGFloat = 520
-    private static let inputVisibleThreshold: CGFloat = 200
-    private static let snapToMinEpsilon: CGFloat = 22
-    private static let snapToInputEpsilon: CGFloat = 28
-    private static let expandCommitDragDistance: CGFloat = 18
+    private static let minPanelHeight: CGFloat = 80 // Just header and handle
+    private static var oneThirdScreenHeight: CGFloat {
+        UIScreen.main.bounds.height / 3
+    }
+    private static let swipeThreshold: CGFloat = 30 // Small gesture threshold for state changes
     
     /// Slightly darker than `anchorCardBg` so the input field's `anchorCardBg` "box"
     /// is visible (matching the full-screen backlog, which sits on `anchorBackground`).
@@ -52,13 +50,16 @@ struct BacklogView: View {
     }
 
     private var isMinimized: Bool {
-        panelHeight <= (Self.minPanelHeight + 0.5)
+        panelHeight <= (Self.minPanelHeight + 5)
+    }
+    
+    private var isAtOneThird: Bool {
+        abs(panelHeight - Self.oneThirdScreenHeight) < 20
     }
     
     private var inputRevealProgress: CGFloat {
-        let denom = max(1, Self.inputVisibleThreshold - Self.minPanelHeight)
-        let raw = (panelHeight - Self.minPanelHeight) / denom
-        return min(1, max(0, raw))
+        // Show input when at 1/3 or above
+        return panelHeight >= Self.oneThirdScreenHeight ? 1.0 : 0.0
     }
     
     private var inputRevealHeight: CGFloat {
@@ -70,8 +71,14 @@ struct BacklogView: View {
     private func togglePanelHeightFromHandleTap() {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             if isMinimized {
-                panelHeight = max(panelHeight, Self.inputVisibleThreshold)
+                // Minimized -> go to 1/3
+                panelHeight = Self.oneThirdScreenHeight
+            } else if isAtOneThird {
+                // At 1/3 -> go to full screen
+                showFullScreenBacklog = true
+                panelHeight = Self.oneThirdScreenHeight
             } else {
+                // Full screen or other -> minimize
                 panelHeight = Self.minPanelHeight
             }
             lastPanelHeight = panelHeight
@@ -79,65 +86,70 @@ struct BacklogView: View {
     }
 
     private var resizeGesture: some Gesture {
-        DragGesture(minimumDistance: 15)
+        DragGesture(minimumDistance: 10)
             .onChanged { value in
                 // Drag up => increase height, drag down => decrease height
-                if !dragCommittedToExpand, value.translation.height < -Self.expandCommitDragDistance {
-                    // Once we know it's an upward swipe (not a tap / slight wobble),
-                    // commit to expanding for the rest of this drag to avoid flicker near thresholds.
-                    dragCommittedToExpand = true
-                }
-
                 let proposed = lastPanelHeight - value.translation.height
-                var clamped = min(max(proposed, Self.minPanelHeight), Self.maxPanelHeight)
-                if dragCommittedToExpand {
-                    clamped = max(clamped, Self.inputVisibleThreshold)
-                }
-                panelHeight = clamped
+                // Allow dragging between min and 1/3, but don't go below min
+                let clamped = max(proposed, Self.minPanelHeight)
+                // Don't allow dragging above 1/3 (full screen is triggered by gesture, not dragging)
+                let maxClamped = min(clamped, Self.oneThirdScreenHeight)
+                panelHeight = maxClamped
             }
             .onEnded { value in
-                dragCommittedToExpand = false
-                // Fast swipe up => open full-screen backlog
-                if value.translation.height < -220 {
-                    showFullScreenBacklog = true
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        panelHeight = Self.minPanelHeight
-                        lastPanelHeight = panelHeight
-                    }
-                    return
-                }
-
-                // Swipe down => minimize (header-only)
-                if value.translation.height > 80 {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        panelHeight = Self.minPanelHeight
-                        lastPanelHeight = panelHeight
-                    }
-                    return
-                }
-
-                // Snap behavior:
-                // - If the user was expanding (ended on an upward drag) and they didn't reach the input threshold,
-                //   resolve to the threshold so the "new task" input is fully visible.
-                // - If they end near the minimized height, resolve to minimized.
-                let clamped = min(max(panelHeight, Self.minPanelHeight), Self.maxPanelHeight)
-                let expanding = value.translation.height < -5
+                let swipeDistance = -value.translation.height // Positive when swiping up
                 
-                let shouldSnapToMin = clamped <= (Self.minPanelHeight + Self.snapToMinEpsilon)
-                let shouldSnapToInput = expanding && clamped < Self.inputVisibleThreshold
-                
-                let target: CGFloat
-                if shouldSnapToMin {
-                    target = Self.minPanelHeight
-                } else if shouldSnapToInput || abs(clamped - Self.inputVisibleThreshold) <= Self.snapToInputEpsilon {
-                    target = Self.inputVisibleThreshold
+                // Determine target state based on swipe direction and distance
+                if swipeDistance > Self.swipeThreshold {
+                    // Swiping up - go to next state
+                    if isMinimized {
+                        // Minimized -> 1/3
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            panelHeight = Self.oneThirdScreenHeight
+                            lastPanelHeight = Self.oneThirdScreenHeight
+                        }
+                    } else if isAtOneThird {
+                        // At 1/3 -> full screen
+                        showFullScreenBacklog = true
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            panelHeight = Self.oneThirdScreenHeight
+                            lastPanelHeight = Self.oneThirdScreenHeight
+                        }
+                    } else {
+                        // Already above 1/3 -> snap to 1/3
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            panelHeight = Self.oneThirdScreenHeight
+                            lastPanelHeight = Self.oneThirdScreenHeight
+                        }
+                    }
+                } else if swipeDistance < -Self.swipeThreshold {
+                    // Swiping down - go to previous state
+                    if isAtOneThird {
+                        // At 1/3 -> minimize
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            panelHeight = Self.minPanelHeight
+                            lastPanelHeight = Self.minPanelHeight
+                        }
+                    } else {
+                        // Already minimized or other -> minimize
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            panelHeight = Self.minPanelHeight
+                            lastPanelHeight = Self.minPanelHeight
+                        }
+                    }
                 } else {
-                    target = clamped
-                }
-                
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    panelHeight = target
-                    lastPanelHeight = target
+                    // Small gesture - snap to nearest state
+                    let midpoint = (Self.minPanelHeight + Self.oneThirdScreenHeight) / 2
+                    let target: CGFloat
+                    if panelHeight < midpoint {
+                        target = Self.minPanelHeight
+                    } else {
+                        target = Self.oneThirdScreenHeight
+                    }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        panelHeight = target
+                        lastPanelHeight = target
+                    }
                 }
             }
     }
@@ -170,6 +182,8 @@ struct BacklogView: View {
                 Text("Backlog")
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(Color.white)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: togglePanelHeightFromHandleTap)
                 Spacer()
 
                 HStack(spacing: 12) {
@@ -192,6 +206,8 @@ struct BacklogView: View {
                                 .stroke(Color.white.opacity(0.3), lineWidth: 1)
                         )
                         .shadow(color: Color.anchorIndigo.opacity(0.3), radius: 4, x: 0, y: 2)
+                        .contentShape(Capsule())
+                        .onTapGesture(perform: togglePanelHeightFromHandleTap)
 
                     Button {
                         // User intent is to type: take them full-screen so the keyboard doesn't hide the field.
@@ -224,8 +240,8 @@ struct BacklogView: View {
                 .opacity(inputRevealProgress)
                 .allowsHitTesting(inputRevealProgress > 0.98)
             
-            // List (hidden when minimized; minimized state is header-only)
-            if !isMinimized {
+            // List (only visible when expanded to 1/3 or above)
+            if !isMinimized && panelHeight >= Self.oneThirdScreenHeight {
                 if !backlogItems.isEmpty {
                     ScrollView {
                         LazyVStack(spacing: 8) {
@@ -312,6 +328,7 @@ struct BacklogView: View {
                 }
             }
         }
+        .frame(height: panelHeight)
         .background(panelBackground)
         .background(
             GeometryReader { proxy in
@@ -326,7 +343,7 @@ struct BacklogView: View {
             // iOS can restore focus to this TextField after dismissing the full-screen cover,
             // even while the compact panel is minimized. That should *not* reopen the cover.
             guard !suppressFocusDrivenFullScreenPresentation else { return }
-            guard !isMinimized else { return }
+            guard !isMinimized && panelHeight >= Self.oneThirdScreenHeight else { return }
             requestFullScreenFocus = true
             showFullScreenBacklog = true
             

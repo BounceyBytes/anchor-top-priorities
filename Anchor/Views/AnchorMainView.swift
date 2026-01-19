@@ -19,8 +19,9 @@ struct AnchorMainView: View {
     @State private var backlogInputFocusRequested: Bool = false
     @State private var backlogVisibleHeight: CGFloat = 0
     
-    // Swipe-to-navigate header animation state.
-    @State private var headerDragOffsetX: CGFloat = 0
+    // Swipe-to-navigate day paging state.
+    // Tracks the user's finger so the current day's UI moves with the gesture.
+    @State private var dayDragOffsetX: CGFloat = 0
     @State private var isCommittingDateSwipe: Bool = false
 
     // Full-screen celebration state.
@@ -32,6 +33,14 @@ struct AnchorMainView: View {
         return allAssignedItems.filter { item in
             guard let assignedDate = item.dateAssigned else { return false }
             return calendar.isDate(assignedDate, inSameDayAs: selectedDate)
+        }.sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    private func items(for date: Date) -> [PriorityItem] {
+        let calendar = Calendar.current
+        return allAssignedItems.filter { item in
+            guard let assignedDate = item.dateAssigned else { return false }
+            return calendar.isDate(assignedDate, inSameDayAs: date)
         }.sorted { $0.orderIndex < $1.orderIndex }
     }
     
@@ -105,10 +114,17 @@ struct AnchorMainView: View {
         .onAppear {
             // Enforce priority limits on app launch to recover from invalid states
             priorityManager.enforceAllPriorityLimits()
+            // If yesterday (or earlier) has incomplete items, copy them into the backlog while keeping them visible on their original day.
+            priorityManager.copyIncompletePastItemsToBacklogIfNeeded()
         }
         .onChange(of: selectedDate) { oldValue, newValue in
             // Enforce limit when switching dates
             priorityManager.enforcePriorityLimit(for: newValue)
+            // If the date changes via any non-swipe path (tap, menu, monthly view),
+            // make sure the swipe pager is visually reset.
+            if !isCommittingDateSwipe {
+                dayDragOffsetX = 0
+            }
         }
         .onChange(of: allAssignedItems) { oldValue, newValue in
             // Enforce limit when items change to catch any invalid states immediately
@@ -116,7 +132,7 @@ struct AnchorMainView: View {
         }
     }
     
-    private var dayHeaderBar: some View {
+    private func dayHeaderBar(for date: Date, isInteractable: Bool) -> some View {
         HStack(alignment: .center, spacing: 12) {
             Menu {
                 Button {
@@ -168,15 +184,17 @@ struct AnchorMainView: View {
                     )
             }
             
-            headerDateTitle
+            headerDateTitle(displayedDate: date)
         }
         .padding(.horizontal)
         .padding(.top, 8)
         .padding(.bottom, 4)
+        .allowsHitTesting(isInteractable)
     }
 
-    private var headerDateTitle: some View {
+    private func headerDateTitle(displayedDate: Date) -> some View {
         StreakCirclesView(
+            displayedDate: displayedDate,
             selectedDate: $selectedDate,
             priorityManager: priorityManager
         )
@@ -185,30 +203,8 @@ struct AnchorMainView: View {
     private var dayView: some View {
         ZStack(alignment: .bottom) {
             // Swipe-to-navigate area (everything *except* the backlog panel).
-            VStack(spacing: 0) {
-                // Date nav / header (pinned to top)
-                dayHeaderBar
-
-                // Daily progress bar
-                DailyProgressBar(items: selectedDateItems)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-
-                // The Anchor
-                DailyPrioritiesView(
-                    selectedDate: selectedDate,
-                    backlogHeight: backlogVisibleHeight,
-                    dateItems: Binding(
-                        get: { selectedDateItems },
-                        set: { _ in }
-                    ),
-                    onCelebrate: triggerTickRain
-                )
-                .padding(.top, 8)
-                
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            daySwipePager
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             // Critical: make the "empty" space in this area hit-testable so a drag can start
             // anywhere that isn't an interactive child view (cards/backlog).
             .contentShape(Rectangle())
@@ -242,6 +238,57 @@ struct AnchorMainView: View {
         }
     }
 
+    private var daySwipePager: some View {
+        GeometryReader { geo in
+            let pageWidth = max(1, geo.size.width)
+            let clampedDrag = max(-pageWidth, min(pageWidth, dayDragOffsetX))
+            let baseOffset = -pageWidth // center the middle page (current day)
+
+            HStack(spacing: 0) {
+                dayPage(
+                    date: Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate,
+                    isCurrent: false
+                )
+                .frame(width: pageWidth)
+
+                dayPage(date: selectedDate, isCurrent: true)
+                    .frame(width: pageWidth)
+
+                dayPage(
+                    date: Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate,
+                    isCurrent: false
+                )
+                .frame(width: pageWidth)
+            }
+            .frame(width: pageWidth * 3, alignment: .leading)
+            .offset(x: baseOffset + clampedDrag)
+        }
+    }
+
+    private func dayPage(date: Date, isCurrent: Bool) -> some View {
+        VStack(spacing: 0) {
+            dayHeaderBar(
+                for: date,
+                isInteractable: isCurrent && !isCommittingDateSwipe && dayDragOffsetX == 0
+            )
+
+            DailyPrioritiesView(
+                selectedDate: date,
+                backlogHeight: backlogVisibleHeight,
+                dateItems: Binding(
+                    get: { items(for: date) },
+                    set: { _ in }
+                ),
+                onCelebrate: triggerTickRain
+            )
+            .padding(.top, 8)
+
+            Spacer(minLength: 0)
+        }
+        // Only the current page should be interactive; adjacent pages are visual during swipes.
+        .allowsHitTesting(isCurrent && !isCommittingDateSwipe)
+    }
+
     private func triggerTickRain() {
         // Restart the animation if it's already running.
         showTickRain = false
@@ -258,53 +305,59 @@ struct AnchorMainView: View {
             .onChanged { value in
                 guard !isCommittingDateSwipe else { return }
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                headerDragOffsetX = value.translation.width
+                dayDragOffsetX = value.translation.width
             }
             .onEnded { value in
                 guard !isCommittingDateSwipe else { return }
                 guard abs(value.translation.width) > abs(value.translation.height) else {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        headerDragOffsetX = 0
+                        dayDragOffsetX = 0
                     }
                     return
                 }
                 
-                let threshold: CGFloat = 110
                 let screenWidth = max(1, UIScreen.main.bounds.width)
                 let endX = value.predictedEndTranslation.width
                 let baseDate = selectedDate
+                let threshold: CGFloat = max(110, screenWidth * 0.22)
                 
                 if endX > threshold {
                     // Swipe right -> previous day
                     isCommittingDateSwipe = true
                     withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.9)) {
-                        headerDragOffsetX = screenWidth
+                        dayDragOffsetX = screenWidth
                     }
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
-                        if let newDate = Calendar.current.date(byAdding: .day, value: -1, to: baseDate) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                        let newDate = Calendar.current.date(byAdding: .day, value: -1, to: baseDate) ?? baseDate
+                        var tx = Transaction()
+                        tx.disablesAnimations = true
+                        withTransaction(tx) {
                             selectedDate = newDate
+                            dayDragOffsetX = 0
+                            isCommittingDateSwipe = false
                         }
-                        headerDragOffsetX = 0
-                        isCommittingDateSwipe = false
                     }
                 } else if endX < -threshold {
                     // Swipe left -> next day
                     isCommittingDateSwipe = true
                     withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.9)) {
-                        headerDragOffsetX = -screenWidth
+                        dayDragOffsetX = -screenWidth
                     }
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
-                        if let newDate = Calendar.current.date(byAdding: .day, value: 1, to: baseDate) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                        let newDate = Calendar.current.date(byAdding: .day, value: 1, to: baseDate) ?? baseDate
+                        var tx = Transaction()
+                        tx.disablesAnimations = true
+                        withTransaction(tx) {
                             selectedDate = newDate
+                            dayDragOffsetX = 0
+                            isCommittingDateSwipe = false
                         }
-                        headerDragOffsetX = 0
-                        isCommittingDateSwipe = false
                     }
                 } else {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        headerDragOffsetX = 0
+                        dayDragOffsetX = 0
                     }
                 }
             }
@@ -312,11 +365,14 @@ struct AnchorMainView: View {
         
     func handleProfileTap() {
         if !calendarManager.isSignedIn {
-            // Find root VC to present sign in
+            // Find the topmost presented view controller to avoid view hierarchy conflicts
             guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                   let rootVC = windowScene.windows.first?.rootViewController else { return }
-            
-            calendarManager.signIn(rootViewController: rootVC)
+            var topVC = rootVC
+            while let presented = topVC.presentedViewController {
+                topVC = presented
+            }
+            calendarManager.signIn(rootViewController: topVC)
         } else {
             // Sign out - signOut() handles main thread safety internally
             calendarManager.signOut()
@@ -325,14 +381,23 @@ struct AnchorMainView: View {
 }
 
 struct StreakCirclesView: View {
+    let displayedDate: Date
     @Binding var selectedDate: Date
     let priorityManager: PriorityManager
+    @Query(filter: #Predicate<PriorityItem> { $0.dateAssigned != nil }, sort: \.orderIndex)
+    private var allAssignedItems: [PriorityItem]
 
     @State private var pulseScale: CGFloat = 1.0
 
     private let circleSize: CGFloat = 14
     private let circleSpacing: CGFloat = 10
     private let daysToShow: Int = 60 // 30 days past and 30 days future
+    
+    private static let streakDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d"
+        return formatter
+    }()
 
     private var calendar: Calendar {
         Calendar.current
@@ -344,7 +409,7 @@ struct StreakCirclesView: View {
 
     private var dateRange: [Date] {
         // Center the range on the selected date, but don't go too far from today
-        let centerDate = selectedDate
+        let centerDate = displayedDate
         let startDate = calendar.date(byAdding: .day, value: -daysToShow/2, to: centerDate) ?? centerDate
         var dates: [Date] = []
         for i in 0..<daysToShow {
@@ -354,23 +419,66 @@ struct StreakCirclesView: View {
         }
         return dates
     }
+    
+    private func prioritiesForDate(_ date: Date) -> [PriorityItem] {
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        
+        return allAssignedItems.filter { item in
+            guard let assignedDate = item.dateAssigned else { return false }
+            return assignedDate >= startOfDay && assignedDate < endOfDay
+        }.sorted { $0.orderIndex < $1.orderIndex }
+    }
 
     private func isTop1Completed(for date: Date) -> Bool {
-        let status = priorityManager.getCompletionStatus(for: date)
-        return status.top1
+        let priorities = prioritiesForDate(date)
+        return priorities.count > 0 && priorities[0].isCompleted
+    }
+    
+    private func hasTop1Priority(for date: Date) -> Bool {
+        return prioritiesForDate(date).count > 0
     }
 
     private func isCurrentDay(_ date: Date) -> Bool {
         calendar.isDateInToday(date)
     }
+    
+    private func isYesterday(_ date: Date) -> Bool {
+        calendar.isDateInYesterday(date)
+    }
+    
+    private func isTomorrow(_ date: Date) -> Bool {
+        calendar.isDateInTomorrow(date)
+    }
+    
+    private func dateAnnotationText(for date: Date) -> String {
+        if isCurrentDay(date) {
+            return "Today"
+        } else if isYesterday(date) {
+            return "Yesterday"
+        } else if isTomorrow(date) {
+            return "Tomorrow"
+        } else {
+            return Self.streakDateFormatter.string(from: date)
+        }
+    }
 
     private func circleGradient(for date: Date) -> LinearGradient {
         let isCompleted = isTop1Completed(for: date)
         let isToday = isCurrentDay(date)
+        let isFuture = date > today
 
         if isToday && !isCompleted {
+            // Today: transparent fill (border and pulse make it visible)
             return LinearGradient(
                 colors: [.clear, .clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if isFuture && !isCompleted {
+            // Future days: subtle neutral fill
+            return LinearGradient(
+                colors: [Color.white.opacity(0.2), Color.white.opacity(0.15)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -399,7 +507,7 @@ struct StreakCirclesView: View {
     }
 
     private func circleBorderWidth(for date: Date) -> CGFloat {
-        let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+        let isSelected = calendar.isDate(date, inSameDayAs: displayedDate)
         let isToday = isCurrentDay(date)
         if isSelected {
             return 2.5
@@ -411,78 +519,101 @@ struct StreakCirclesView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            let centerOffset = (geometry.size.width - circleSize) / 2
+        VStack(spacing: 4) {
+            GeometryReader { geometry in
+                let centerOffset = (geometry.size.width - circleSize) / 2
 
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: circleSpacing) {
-                        ForEach(Array(dateRange.enumerated()), id: \.element) { index, date in
-                            let isToday = isCurrentDay(date)
-                            let isCompleted = isTop1Completed(for: date)
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: circleSpacing) {
+                            ForEach(Array(dateRange.enumerated()), id: \.element) { index, date in
+                                let isToday = isCurrentDay(date)
+                                let isCompleted = isTop1Completed(for: date)
+                                let hasPriority = hasTop1Priority(for: date)
 
-                            Circle()
-                                .fill(circleGradient(for: date))
-                                .frame(width: circleSize, height: circleSize)
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(circleBorderColor(for: date), lineWidth: circleBorderWidth(for: date))
-                                )
-                                .overlay(
-                                    // Add glow effect for completed circles
-                                    Group {
+                                Circle()
+                                    .fill(circleGradient(for: date))
+                                    .frame(width: circleSize, height: circleSize)
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(circleBorderColor(for: date), lineWidth: circleBorderWidth(for: date))
+                                    )
+                                    .overlay {
+                                        // Show checkmark for completed days
                                         if isCompleted {
-                                            Circle()
-                                                .stroke(Color.anchorStreakGreen.opacity(0.3), lineWidth: 2)
-                                                .blur(radius: 2)
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundStyle(.white)
+                                        }
+                                        // Show X for incomplete days (but not today or future days without completion)
+                                        else if hasPriority && !isToday && date <= today {
+                                            Image(systemName: "xmark")
+                                                .font(.system(size: 7, weight: .bold))
+                                                .foregroundStyle(.white)
                                         }
                                     }
-                                )
-                                .scaleEffect(isToday && !isCompleted ? pulseScale : 1.0)
-                                .shadow(
-                                    color: isCompleted ? Color.anchorStreakGreen.opacity(0.4) :
-                                           isToday ? Color.white.opacity(0.2) : .clear,
-                                    radius: isCompleted ? 4 : 2,
-                                    x: 0,
-                                    y: 0
-                                )
-                                .id(index)
-                                .onTapGesture {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        selectedDate = date
-                                        proxy.scrollTo(index, anchor: .center)
+                                    .overlay(
+                                        // Add glow effect for completed circles
+                                        Group {
+                                            if isCompleted {
+                                                Circle()
+                                                    .stroke(Color.anchorStreakGreen.opacity(0.3), lineWidth: 2)
+                                                    .blur(radius: 2)
+                                            }
+                                        }
+                                    )
+                                    .scaleEffect(isToday && !isCompleted ? pulseScale : 1.0)
+                                    .shadow(
+                                        color: isCompleted ? Color.anchorStreakGreen.opacity(0.4) :
+                                               isToday ? Color.white.opacity(0.2) : .clear,
+                                        radius: isCompleted ? 4 : 2,
+                                        x: 0,
+                                        y: 0
+                                    )
+                                    .id(index)
+                                    .onTapGesture {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            selectedDate = date
+                                            proxy.scrollTo(index, anchor: .center)
+                                        }
                                     }
+                            }
+                        }
+                        .padding(.horizontal, centerOffset)
+                    }
+                    .onAppear {
+                        // Start pulse animation for today
+                        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                            pulseScale = 1.3
+                        }
+
+                        // Scroll to selected date on appear
+                        if let selectedIndex = dateRange.firstIndex(where: { calendar.isDate($0, inSameDayAs: displayedDate) }) {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation {
+                                    proxy.scrollTo(selectedIndex, anchor: .center)
                                 }
+                            }
                         }
                     }
-                    .padding(.horizontal, centerOffset)
-                }
-                .onAppear {
-                    // Start pulse animation for today
-                    withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                        pulseScale = 1.3
-                    }
-
-                    // Scroll to selected date on appear
-                    if let selectedIndex = dateRange.firstIndex(where: { calendar.isDate($0, inSameDayAs: selectedDate) }) {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation {
-                                proxy.scrollTo(selectedIndex, anchor: .center)
+                    .onChange(of: displayedDate) { oldValue, newValue in
+                        // Scroll to new displayed date (used during swipe paging).
+                        if let newIndex = dateRange.firstIndex(where: { calendar.isDate($0, inSameDayAs: newValue) }) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                proxy.scrollTo(newIndex, anchor: .center)
                             }
                         }
                     }
                 }
-                .onChange(of: selectedDate) { oldValue, newValue in
-                    // Scroll to new selected date
-                    if let newIndex = dateRange.firstIndex(where: { calendar.isDate($0, inSameDayAs: newValue) }) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            proxy.scrollTo(newIndex, anchor: .center)
-                        }
-                    }
-                }
             }
+            .frame(height: circleSize + 4) // Add some vertical padding
+            
+            // Date annotation for selected date
+            Text(dateAnnotationText(for: displayedDate))
+                .anchorFont(.caption2, weight: .medium)
+                .foregroundStyle(.secondary)
+                .frame(height: 16)
         }
-        .frame(height: circleSize + 4) // Add some vertical padding
     }
 }
 

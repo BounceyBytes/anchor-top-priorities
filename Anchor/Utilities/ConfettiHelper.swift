@@ -67,7 +67,7 @@ private struct TickRainParticle: View {
 
         return Image(systemName: "checkmark.circle.fill")
             .font(.system(size: spec.size, weight: .semibold))
-            .foregroundStyle(Color.green.opacity(spec.opacity))
+            .foregroundStyle(Color.anchorSuccessTeal.opacity(spec.opacity))
             .rotationEffect(.degrees(spec.rotation))
             .scaleEffect(scale)
             .position(x: spec.startX, y: y)

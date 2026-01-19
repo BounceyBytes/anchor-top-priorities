@@ -25,9 +25,14 @@ struct SchedulingSheet: View {
                     
                     VStack(spacing: 12) {
                         Button("Sign In with Google") {
-                            guard let scenes = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                  let root = scenes.windows.first?.rootViewController else { return }
-                            calendarManager.signIn(rootViewController: root)
+                            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                  let rootVC = windowScene.windows.first?.rootViewController else { return }
+                            // Find the topmost presented view controller to avoid view hierarchy conflicts
+                            var topVC = rootVC
+                            while let presented = topVC.presentedViewController {
+                                topVC = presented
+                            }
+                            calendarManager.signIn(rootViewController: topVC)
                         }
                         .buttonStyle(.borderedProminent)
                         

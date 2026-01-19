@@ -8,6 +8,9 @@ struct DailyPrioritiesView: View {
     let backlogHeight: CGFloat
     @Binding var dateItems: [PriorityItem]
     let onCelebrate: () -> Void
+
+    @Query(filter: #Predicate<PriorityItem> { $0.dateAssigned == nil })
+    private var backlogItems: [PriorityItem]
     
     @State private var newItemTitle = ""
     @State private var isAddingTask = false
@@ -29,6 +32,10 @@ struct DailyPrioritiesView: View {
     private let listHorizontalPadding: CGFloat = 16
     private let swipeAffordanceThreshold: CGFloat = 100
     private let swipeAffordanceMinDistance: CGFloat = 12
+
+    private func normalizedTitle(_ title: String) -> String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
     
     private func slotMinHeight(for priorityNumber: Int) -> CGFloat {
         // Keep the 3 slots the same height so the vertical rhythm (and perceived "gap" between cards)
@@ -37,15 +44,22 @@ struct DailyPrioritiesView: View {
     }
     
     var body: some View {
+        let backlogSourceIds = Set(backlogItems.compactMap(\.sourceItemId))
+        let backlogTitleKeys = Set(backlogItems.map { normalizedTitle($0.title) })
+        let calendar = Calendar.current
+        let isPastDay = calendar.startOfDay(for: selectedDate) < calendar.startOfDay(for: Date())
+
         VStack(spacing: slotSpacing) {
             // Show filled priorities with drag and drop
             ForEach(Array(dateItems.enumerated()), id: \.element.id) { index, item in
                 let isActiveDrag = draggedItem?.id == item.id
+                let isCopiedToBacklog = backlogSourceIds.contains(item.id) || backlogTitleKeys.contains(normalizedTitle(item.title))
                 PrioritySlotCard(
                     item: item,
                     priorityNumber: index + 1,
                     color: slotColors[index % slotColors.count],
                     editingItemId: $editingItemId,
+                    showCopiedToBacklogIndicator: isPastDay && !item.isCompleted && isCopiedToBacklog,
                     onCelebrate: onCelebrate,
                     onComplete: { priorityManager.toggleCompletion(item) },
                     onPunt: {
@@ -127,7 +141,7 @@ struct DailyPrioritiesView: View {
                         )
                         .frame(maxWidth: .infinity, minHeight: slotMinHeight(for: index + 1), alignment: .top)
                     } else {
-                        EmptySlotCard(priorityNumber: index + 1, color: slotColors[index])
+                        EmptySlotCard(priorityNumber: index + 1, color: .anchorNeutral)
                             .frame(maxWidth: .infinity, minHeight: slotMinHeight(for: index + 1), alignment: .top)
                             .onTapGesture {
                                 isAddingTask = true
@@ -186,27 +200,35 @@ struct DailyPrioritiesView: View {
                     generator.impactOccurred()
                 }
             }
+            
+            // Reset drag state with animation for horizontal swipe (card stays in place)
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                dragOffset = .zero
+                draggedItem = nil
+            }
         } else {
             // Vertical drag - reorder priorities
             let dragDistance = value.translation.height
             let newIndex = reorderedIndex(from: index, dragDistance: dragDistance)
             
+            // Clear drag state immediately (no animation) so the card doesn't 
+            // animate back to its old position while the list reorders
+            dragOffset = .zero
+            draggedItem = nil
+            
             if newIndex != index {
-                var reorderedItems = dateItems
-                reorderedItems.remove(at: index)
-                reorderedItems.insert(item, at: newIndex)
-                priorityManager.reorderPriorities(reorderedItems)
+                // Animate the reorder transition
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    var reorderedItems = dateItems
+                    reorderedItems.remove(at: index)
+                    reorderedItems.insert(item, at: newIndex)
+                    priorityManager.reorderPriorities(reorderedItems)
+                }
                 
                 // Haptic feedback for successful reorder
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.success)
             }
-        }
-        
-        // Reset drag state with animation
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            dragOffset = .zero
-            draggedItem = nil
         }
     }
     
@@ -256,6 +278,7 @@ struct PrioritySlotCard: View {
     let priorityNumber: Int
     let color: Color
     @Binding var editingItemId: UUID?
+    let showCopiedToBacklogIndicator: Bool
     let onCelebrate: () -> Void
     let onComplete: () -> Void
     let onPunt: () -> Void
@@ -392,6 +415,17 @@ struct PrioritySlotCard: View {
                                 .font(.system(size: 12, weight: .bold))
                             
                             Text(scheduledText)
+                                .anchorFont(.caption2, weight: .semibold)
+                        }
+                        .foregroundStyle(secondaryForegroundColor)
+                        .lineLimit(1)
+                    }
+
+                    if showCopiedToBacklogIndicator {
+                        HStack(spacing: 4) {
+                            Image(systemName: "tray.and.arrow.down.fill")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("Copied to backlog")
                                 .anchorFont(.caption2, weight: .semibold)
                         }
                         .foregroundStyle(secondaryForegroundColor)
@@ -802,10 +836,11 @@ struct EmptySlotCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             // Line 2: Empty space to match action buttons row in PrioritySlotCard
+            // Action buttons are 32pt tall, so we match that height
             HStack(spacing: 8) {
                 Spacer()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
