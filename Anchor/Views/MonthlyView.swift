@@ -202,40 +202,28 @@ struct DayCellView: View {
         }.sorted { $0.orderIndex < $1.orderIndex }
     }
     
-    private var completionStatus: (top1: Bool, top2: Bool, top3: Bool) {
-        let priorities = prioritiesForDate
-        let top1 = priorities.count > 0 && priorities[0].isCompleted
-        let top2 = priorities.count > 1 && priorities[1].isCompleted
-        let top3 = priorities.count > 2 && priorities[2].isCompleted
-        return (top1, top2, top3)
-    }
-    
-    private var streakLength: Int {
-        priorityManager.getStreakLength(endingAt: date)
-    }
-
-    /// True when this day is part of a *consecutive-day* streak of completing the #1 priority.
-    /// (We treat a "streak" as length >= 2.)
-    private var isInTop1Streak: Bool {
-        !isFuture && completionStatus.top1 && streakLength > 1
-    }
-    
     private var hasTop1Priority: Bool {
         prioritiesForDate.count > 0
     }
     
     private var top1Completed: Bool {
-        completionStatus.top1
+        let priorities = prioritiesForDate
+        return priorities.count > 0 && priorities[0].isCompleted
+    }
+    
+    private var shouldShowGreyBackground: Bool {
+        // Show grey for current day when task #1 is not completed
+        isToday && hasTop1Priority && !top1Completed
     }
     
     private var shouldShowRedBackground: Bool {
-        // Show red if there was a #1 priority but it wasn't completed, and it's not today (today is in progress)
+        // Show red if there was a #1 priority but it wasn't completed (past days only)
         !isFuture && hasTop1Priority && !top1Completed && !isToday
     }
     
     private var shouldShowGreenBackground: Bool {
-        // Show green only for days that are part of a consecutive-day streak of completing #1
-        isInTop1Streak
+        // Show green when top task is completed
+        !isFuture && top1Completed
     }
     
     var body: some View {
@@ -252,6 +240,12 @@ struct DayCellView: View {
                     shouldShowRedBackground ?
                         LinearGradient(
                             colors: [Color.anchorStreakRed.opacity(0.4), Color.anchorStreakRed.opacity(0.3)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                    shouldShowGreyBackground ?
+                        LinearGradient(
+                            colors: [Color(red: 0.4, green: 0.4, blue: 0.4).opacity(0.4), Color(red: 0.4, green: 0.4, blue: 0.4).opacity(0.3)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ) :
@@ -308,107 +302,9 @@ struct DayCellView: View {
                 Text("\(dayNumber)")
                     .font(.system(.caption, design: .rounded).weight(isToday ? .bold : .medium))
                     .foregroundStyle(
-                        shouldShowGreenBackground || shouldShowRedBackground ? .white :
+                        shouldShowGreenBackground || shouldShowRedBackground || shouldShowGreyBackground ? .white :
                         (isFuture ? Color.white.opacity(0.4) : Color.white.opacity(0.9))
                     )
-
-                // Completion indicators (only show if not using full background)
-                if !isFuture && !shouldShowGreenBackground && !shouldShowRedBackground {
-                    HStack(spacing: 3) {
-                        // Top 1 indicator
-                        if hasTop1Priority {
-                            Circle()
-                                .fill(
-                                    completionStatus.top1 ?
-                                        LinearGradient(
-                                            colors: [Color.anchorCoral, Color.anchorCoralDeep],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ) :
-                                        LinearGradient(
-                                            colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                )
-                                .frame(width: 7, height: 7)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(completionStatus.top1 ? 0.3 : 0.1), lineWidth: 0.5)
-                                )
-                        }
-
-                        // Top 2 indicator
-                        if prioritiesForDate.count > 1 {
-                            Circle()
-                                .fill(
-                                    completionStatus.top2 ?
-                                        LinearGradient(
-                                            colors: [Color.anchorMint, Color.anchorAmber],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ) :
-                                        LinearGradient(
-                                            colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                )
-                                .frame(width: 7, height: 7)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(completionStatus.top2 ? 0.3 : 0.1), lineWidth: 0.5)
-                                )
-                        }
-
-                        // Top 3 indicator
-                        if prioritiesForDate.count > 2 {
-                            Circle()
-                                .fill(
-                                    completionStatus.top3 ?
-                                        LinearGradient(
-                                            colors: [Color.anchorIndigo, Color.anchorDeepIndigo],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ) :
-                                        LinearGradient(
-                                            colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                )
-                                .frame(width: 7, height: 7)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(completionStatus.top3 ? 0.3 : 0.1), lineWidth: 0.5)
-                                )
-                        }
-                    }
-
-                    // Streak indicator with gradient
-                    if streakLength > 1 && completionStatus.top1 {
-                        Text("\(streakLength)")
-                            .font(.system(size: 9, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color.anchorStreakGreen, Color.anchorStreakTeal],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
-                                    )
-                                    .shadow(color: Color.anchorStreakGreen.opacity(0.4), radius: 2, x: 0, y: 1)
-                            )
-                    }
-                }
             }
         }
         .frame(height: 60)

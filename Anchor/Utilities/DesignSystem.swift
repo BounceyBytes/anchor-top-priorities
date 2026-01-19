@@ -22,11 +22,18 @@ extension Color {
     // Completion / Success - Enhanced with gradient capability
     static let anchorCompletedGreen = Color(red: 0.70, green: 0.88, blue: 0.75) // Pastel green - soft and muted
     static let anchorCompletedTeal = Color(red: 0.4, green: 0.8, blue: 0.7) // Teal for gradient
+    static let anchorCompletedSlate = Color(red: 0.55, green: 0.72, blue: 0.82) // Stronger steel blue
+
+    // Success accent - Teal for completion indicators, swipe affordances, calendar dots
+    static let anchorSuccessTeal = Color(red: 0.2, green: 0.75, blue: 0.78) // Vibrant teal
 
     // Streak indicators - with gradient support
     static let anchorStreakGreen = Color(red: 0.4, green: 0.8, blue: 0.5)
     static let anchorStreakTeal = Color(red: 0.3, green: 0.7, blue: 0.6)
     static let anchorStreakRed = Color(red: 0.9, green: 0.3, blue: 0.3)
+
+    // Neutral - For empty placeholders and inactive elements
+    static let anchorNeutral = Color(red: 0.55, green: 0.55, blue: 0.58) // Warm gray
 
     // Text - Higher contrast for dark mode
     static let anchorTextPrimary = Color.white

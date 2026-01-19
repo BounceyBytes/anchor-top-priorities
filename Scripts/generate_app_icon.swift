@@ -177,21 +177,21 @@ func drawAnchorMark(_ variant: Variant, in ctx: CGContext) {
 }
 
 func drawBackground(_ variant: Variant, in ctx: CGContext) {
-    // Green gradient background (subtle depth; reads well behind a simple white mark).
+    // Teal gradient background (matches app's success/completion color scheme).
     let (c1, c2, glow): (NSColor, NSColor, NSColor)
     switch variant {
     case .default:
-        c1 = RGBA(r: 0.05, g: 0.45, b: 0.26, a: 1.0).ns   // deep green
-        c2 = RGBA(r: 0.20, g: 0.90, b: 0.55, a: 1.0).ns   // bright green
-        glow = RGBA(r: 0.60, g: 1.00, b: 0.78, a: 0.22).ns
+        c1 = RGBA(r: 0.08, g: 0.42, b: 0.48, a: 1.0).ns   // deep teal
+        c2 = RGBA(r: 0.20, g: 0.78, b: 0.82, a: 1.0).ns   // bright teal (anchorSuccessTeal)
+        glow = RGBA(r: 0.50, g: 0.92, b: 0.95, a: 0.22).ns
     case .dark:
-        c1 = RGBA(r: 0.03, g: 0.30, b: 0.18, a: 1.0).ns
-        c2 = RGBA(r: 0.10, g: 0.62, b: 0.38, a: 1.0).ns
-        glow = RGBA(r: 0.45, g: 0.95, b: 0.70, a: 0.14).ns
+        c1 = RGBA(r: 0.05, g: 0.30, b: 0.35, a: 1.0).ns
+        c2 = RGBA(r: 0.12, g: 0.58, b: 0.62, a: 1.0).ns
+        glow = RGBA(r: 0.40, g: 0.85, b: 0.88, a: 0.14).ns
     case .tinted:
-        c1 = RGBA(r: 0.10, g: 0.55, b: 0.32, a: 1.0).ns
-        c2 = RGBA(r: 0.35, g: 0.98, b: 0.64, a: 1.0).ns
-        glow = RGBA(r: 0.70, g: 1.00, b: 0.84, a: 0.18).ns
+        c1 = RGBA(r: 0.12, g: 0.52, b: 0.58, a: 1.0).ns
+        c2 = RGBA(r: 0.30, g: 0.88, b: 0.92, a: 1.0).ns
+        glow = RGBA(r: 0.60, g: 0.95, b: 0.98, a: 0.18).ns
     }
 
     ctx.saveGState()
