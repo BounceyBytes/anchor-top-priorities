@@ -1,63 +1,70 @@
 # Anchor
 
-Anchor is an iOS app (SwiftUI) for keeping your **top 3 priorities per day** front-and-center, with a lightweight backlog and optional Google Calendar scheduling.
+Anchor is a SwiftUI iOS app for planning each day around your top three priorities, while keeping everything else in a backlog.
 
-## What the app currently does
+## Features
 
-- **Daily “Mission” (Top 3)**
-  - Pick up to **3 priorities** for any day.
-  - Swipe **right** to mark complete, swipe **left** to un-complete.
-  - Drag **up/down** to reorder the day’s priorities.
-  - “Punt to tomorrow”, rename, delete, or move a priority back to the backlog.
-  - The app enforces the **3-per-day limit** (and will automatically recover if an invalid state is detected).
+- Daily mission (top 3)
+  - Assign up to 3 priorities to any day.
+  - Reorder priorities with drag and drop.
+  - Mark complete/incomplete with swipe gestures.
+  - Punt to tomorrow, rename, delete, or move items to backlog.
+  - Automatic guardrails enforce the 3-per-day limit.
 
-- **Backlog**
-  - Keep unscheduled tasks in a backlog.
-  - Compact backlog panel at the bottom, with a full-screen backlog for fast entry.
-  - Move backlog items onto the currently selected day (respecting the 3-per-day limit).
+- Backlog workflow
+  - Keep unscheduled work in a backlog (compact + full-screen entry flows).
+  - Move backlog items into a selected day while respecting limits.
+  - Incomplete past-day priorities can be copied into backlog without duplicates.
 
-- **Date navigation + history**
-  - Swipe to move between days.
-  - **Monthly view** shows day-level completion indicators and a **Top-1 streak** visualization.
-  - Header includes a streak “circles” timeline you can tap to jump to a date.
+- Navigation and streaks
+  - Swipe horizontally between days.
+  - Monthly view includes day completion indicators.
+  - Top-1 streak visualization is shown in both monthly view and header circles.
 
-- **Pomodoro**
-  - Start a 25-minute focus timer for a selected priority.
+- Focus timer
+  - Built-in 25-minute Pomodoro timer per priority.
 
-- **Google Calendar (optional)**
-  - Sign in/out via Google Sign-In.
-  - “Schedule” a priority: see today’s calendar events and place a task block on a draggable timeline.
-  - Detects conflicts before scheduling.
-  - Creates an event in the user’s **primary** calendar and stores the resulting event ID on the priority item.
+- Optional Google Calendar scheduling
+  - Google Sign-In support.
+  - Visual scheduling sheet with existing day events.
+  - Conflict detection before creating calendar events.
+  - Stores created event linkage on the corresponding priority item.
 
 ## Data model
 
-The app persists data using **SwiftData** with a single model:
+Data is persisted with SwiftData using `PriorityItem`:
 
-- `PriorityItem`
-  - `dateAssigned == nil` → backlog item
-  - `dateAssigned != nil` → assigned to that day (ordered by `orderIndex`)
+- `dateAssigned == nil`: backlog item
+- `dateAssigned != nil`: day-assigned item (ordered by `orderIndex`)
+- Optional fields support notes, backlog-copy lineage, and calendar linkage.
 
-## Running the app
+## Requirements
 
-- Open `Anchor.xcodeproj` in Xcode
-- Select an iOS Simulator (or device) and Run
+- Xcode 16+
+- iOS 18+ simulator or device
 
-## Google Calendar setup notes
+## Run locally
 
-Google Calendar features use the client ID in:
+1. Open `Anchor.xcodeproj` in Xcode.
+2. Select the `Anchor` scheme.
+3. Run on an iOS simulator or connected device.
+
+## Google Calendar configuration
+
+Google Calendar integration is implemented in:
 
 - `Anchor/Utilities/GoogleCalendarManager.swift`
 
-If you change the Google OAuth client ID:
+If you rotate or replace OAuth credentials:
 
-- Update the **URL scheme** in `AnchorApp-Info.plist` to the reversed client ID
-- There’s also a helper build script: `Anchor/add_url_scheme.sh`
+1. Update the client ID used by `GoogleCalendarManager`.
+2. Update the reversed-client-ID URL scheme in `AnchorApp-Info.plist`.
+3. If needed, run `Anchor/add_url_scheme.sh` to help apply URL scheme updates.
 
-## Project layout (high level)
+## Project structure
 
-- `Anchor/Views/`: SwiftUI screens (daily priorities, backlog, monthly view, scheduling sheet, pomodoro)
-- `Anchor/ViewModels/`: app logic (`PriorityManager`, `PomodoroTimer`)
-- `Anchor/Utilities/`: design system, confetti/tick-rain effect, Google Calendar integration
-
+- `Anchor/Views/`: SwiftUI screens and feature views.
+- `Anchor/ViewModels/`: state and business logic (`PriorityManager`, `PomodoroTimer`).
+- `Anchor/Models/`: SwiftData models (`PriorityItem`).
+- `Anchor/Utilities/`: design system and platform integrations.
 
